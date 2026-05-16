@@ -2,9 +2,11 @@ services:
   - type: web
     name: job-monitor-node
     env: node
-    buildCommand: npm install && npx playwright install firefox --with-deps
+    buildCommand: npm install && npx playwright install firefox
     startCommand: node server.js
     envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
       - key: APPS_SCRIPT_URL
         sync: false
       - key: TELEGRAM_BOT_TOKEN

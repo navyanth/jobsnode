@@ -43,6 +43,7 @@ async function getNaukriHeaders() {
     console.log(`[Browser] Using: Firefox headless`);
 
     const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
       viewport: { width: 1366, height: 768 },
       locale: 'en-US',
       timezoneId: 'Asia/Kolkata',
@@ -75,12 +76,16 @@ async function getNaukriHeaders() {
     const runSteps = async () => {
       try {
         console.log('[Browser] Step 1: Loading homepage...');
-        await page.goto('https://www.naukri.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        try {
+          await page.goto('https://www.naukri.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 1 err: ${e.message}`); }
         await page.waitForTimeout(3000);
         console.log(`[Browser] Homepage loaded. Naukri API requests so far: ${requestCount}`);
 
         console.log('[Browser] Step 2: Loading search page...');
-        await page.goto('https://www.naukri.com/java-fresher-jobs', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        try {
+          await page.goto('https://www.naukri.com/java-fresher-jobs', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 2 err: ${e.message}`); }
         await page.waitForTimeout(3000);
         console.log(`[Browser] Search page loaded. Naukri API requests so far: ${requestCount}`);
 
@@ -91,7 +96,9 @@ async function getNaukriHeaders() {
         }
 
         console.log('[Browser] Step 4: Trying experience-filtered URL...');
-        await page.goto('https://www.naukri.com/java-jobs-in-india?experience=0', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        try {
+          await page.goto('https://www.naukri.com/java-jobs-in-india?experience=0', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 4 err: ${e.message}`); }
         await page.waitForTimeout(4000);
         for (let i = 0; i < 5; i++) {
           await page.mouse.wheel(0, 600);
@@ -101,7 +108,7 @@ async function getNaukriHeaders() {
         // Ignore "Target closed" or "context closed" errors, which happen 
         // when we successfully find the headers and close the browser early.
         if (!err.message.includes('closed')) {
-          console.log(`[Browser] Navigation error: ${err.message}`);
+          console.log(`[Browser] Navigation sequence error: ${err.message}`);
         }
       }
     };
