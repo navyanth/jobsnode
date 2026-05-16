@@ -175,10 +175,14 @@ async function scrapeOnce(headers) {
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log(`[${timestamp}] Polling for '${keyword}'...`);
 
-  // Filter out pseudo-headers (HTTP/2 headers starting with ':')
+  // Filter out pseudo-headers and headers that cause Node fetch to hang or get tarpitted
   const cleanHeaders = {};
   for (const [k, v] of Object.entries(headers)) {
-    if (!k.startsWith(':')) cleanHeaders[k] = v;
+    const key = k.toLowerCase();
+    if (!key.startsWith(':') && 
+        !['accept-encoding', 'host', 'connection', 'content-length'].includes(key)) {
+      cleanHeaders[k] = v;
+    }
   }
 
   let res;
