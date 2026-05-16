@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naukri Job Scraper Dashboard</title>
+    <meta name="description"
+        content="Real-time Naukri job discovery engine — monitor new job listings with automated scraping and notifications.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #020617;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: rgba(51, 65, 85, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.05) 0%, transparent 40%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .logo-section h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-section p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .header-badges {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+        }
+
+        .sheets-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .status-dot.stopped {
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger);
+            animation: none;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+
+        .settings-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            height: fit-content;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .settings-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-color);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.25);
+        }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            margin-top: 1rem;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .btn-danger {
+            background: var(--card-bg);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            margin-top: 1rem;
+        }
+
+        .jobs-header-row {
+            margin-bottom: 2rem;
+        }
+
+        .jobs-header-row h2 {
+            margin-bottom: 1rem;
+        }
+
+        .jobs-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.6rem 1rem;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        .sort-select {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.6rem 1rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .jobs-header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-left: auto;
+        }
+
+        .job-count {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .refresh-btn {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: underline;
+            font-family: inherit;
+            transition: color 0.2s;
+        }
+
+        .refresh-btn:hover {
+            color: var(--accent-hover);
+        }
+
+        .job-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .job-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .job-card:hover {
+            transform: scale(1.02);
+            border-color: var(--accent);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .job-info h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .job-info .company {
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .job-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .job-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .view-job-btn {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .view-job-btn:hover {
+            background: var(--accent);
+            color: var(--bg-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            border-radius: 24px;
+            border: 1px dashed var(--border);
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0.85rem 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transform: translateY(120%);
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 1rem;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .settings-card {
+                position: relative;
+                top: 0;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .logo-section h1 {
+                font-size: 2rem;
+            }
+
+            .job-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .view-job-btn {
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <h1>Naukri Scraper</h1>
+                <p>Real-time job discovery engine</p>
+            </div>
+            <div class="header-badges">
+                <div class="sheets-badge">📊 Google Sheets DB</div>
+                <div class="status-badge">
+                    <div id="statusDot" class="status-dot"></div>
+                    <span id="statusText">Running</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <aside class="settings-card">
+                <h2>⚙️ Configuration</h2>
+                <div class="input-group">
+                    <label for="keywordInput">Keyword</label>
+                    <input type="text" id="keywordInput" placeholder="e.g. java fresher">
+                </div>
+                <div class="input-group">
+                    <label for="locationInput">Location</label>
+                    <input type="text" id="locationInput" placeholder="e.g. india">
+                </div>
+                <div class="input-group">
+                    <label for="expInput">Experience (Years)</label>
+                    <input type="text" id="expInput" placeholder="e.g. 0">
+                </div>
+
+                <button id="saveBtn" class="btn btn-primary">💾 Update & Apply</button>
+                <button id="toggleBtn" class="btn btn-secondary">⏸ Stop Scraper</button>
+                <button id="clearBtn" class="btn btn-danger">🗑 Clear Database</button>
+            </aside>
+
+            <main class="jobs-section">
+                <div class="jobs-header-row">
+                    <h2>Latest Jobs Found</h2>
+                    <div class="jobs-controls">
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="🔍 Search in results...">
+                        </div>
+                        <select id="sortSelect" class="sort-select">
+                            <option value="date-desc">📅 Newest First</option>
+                            <option value="date-asc">📅 Oldest First</option>
+                            <option value="title-asc">🔤 Title (A-Z)</option>
+                            <option value="company-asc">🏢 Company (A-Z)</option>
+                        </select>
+                        <div class="jobs-header-right">
+                            <span id="jobCount" class="job-count"></span>
+                            <button id="refreshBtn" class="refresh-btn">↻ Refresh</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="jobList" class="job-list">
+                    <div class="empty-state">
+                        <div class="icon">⏳</div>
+                        Loading jobs...
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const keywordInput = $('keywordInput');
+        const locationInput = $('locationInput');
+        const expInput = $('expInput');
+        const saveBtn = $('saveBtn');
+        const toggleBtn = $('toggleBtn');
+        const clearBtn = $('clearBtn');
+        const searchInput = $('searchInput');
+        const sortSelect = $('sortSelect');
+        const jobList = $('jobList');
+        const jobCount = $('jobCount');
+        const statusDot = $('statusDot');
+        const statusText = $('statusText');
+        const toastEl = $('toast');
+
+        let isRunning = false;
+        let allJobs = []; // Store fetched jobs locally
+
+        // ── Toast ─────────────────────────────────────────────────────────────
+        function showToast(msg, duration = 3000) {
+            toastEl.textContent = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), duration);
+        }
+
+        // ── API Helpers ───────────────────────────────────────────────────────
+        async function fetchSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                keywordInput.value = data.keyword || '';
+                locationInput.value = data.location || '';
+                expInput.value = data.experience || '0';
+            } catch (err) {
+                console.error('Failed to fetch settings:', err);
+            }
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                isRunning = data.status === 'running';
+                updateStatusUI();
+            } catch (err) {
+                console.error('Failed to fetch status:', err);
+            }
+        }
+
+        function updateStatusUI() {
+            if (isRunning) {
+                statusDot.classList.remove('stopped');
+                statusText.innerText = 'Running';
+                toggleBtn.innerHTML = '⏸ Stop Scraper';
+                toggleBtn.classList.remove('btn-primary');
+                toggleBtn.classList.add('btn-secondary');
+            } else {
+                statusDot.classList.add('stopped');
+                statusText.innerText = 'Stopped';
+                toggleBtn.innerHTML = '▶ Start Scraper';
+                toggleBtn.classList.remove('btn-secondary');
+                toggleBtn.classList.add('btn-primary');
+            }
+        }
+
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/api/jobs');
+                allJobs = await res.json();
+                renderJobs();
+            } catch (err) {
+                console.error('Failed to fetch jobs:', err);
+            }
+        }
+
+        function renderJobs() {
+            const query = searchInput.value.toLowerCase();
+            const sortBy = sortSelect.value;
+
+            // 1. Filter
+            let filtered = allJobs.filter(job => {
+                const title = (job.title || '').toLowerCase();
+                const company = (job.company || '').toLowerCase();
+                return title.includes(query) || company.includes(query);
+            });
+
+            // 2. Sort
+            filtered.sort((a, b) => {
+                if (sortBy === 'date-desc') return new Date(b.date || b.seen_at) - new Date(a.date || a.seen_at);
+                if (sortBy === 'date-asc') return new Date(a.date || a.seen_at) - new Date(b.date || b.seen_at);
+                if (sortBy === 'title-asc') return (a.title || '').localeCompare(b.title || '');
+                if (sortBy === 'company-asc') return (a.company || '').localeCompare(b.company || '');
+                return 0;
+            });
+
+            // 3. Render
+            jobCount.textContent = `${filtered.length} job${filtered.length !== 1 ? 's' : ''}`;
+
+            if (filtered.length === 0) {
+                jobList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">🔍</div>
+                        No matches found.
+                    </div>`;
+                return;
+            }
+
+            jobList.innerHTML = filtered.map((job, index) => {
+                const title = job.title || 'Unknown Title';
+                const company = job.company || 'Unknown Company';
+                const location = job.location || 'Remote/India';
+                const date = job.date || job.seen_at || job.timestamp || '';
+                const url = job.url || '#';
+                const source = job.source || 'Naukri';
+
+                return `
+                    <div class="job-card" style="animation-delay: ${index * 0.04}s">
+                        <div class="job-info">
+                            <h3>${escapeHtml(title)}</h3>
+                            <div class="company">${escapeHtml(company)}</div>
+                            <div class="job-meta">
+                                <span>📍 ${escapeHtml(location)}</span>
+                                <span>📅 ${formatDate(date)}</span>
+                                <span>🟠 ${escapeHtml(source)}</span>
+                            </div>
+                        </div>
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="view-job-btn">View Job →</a>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '—';
+            try {
+                const d = new Date(iso);
+                return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            } catch {
+                return iso;
+            }
+        }
+
+        // ── Input Event Listeners ─────────────────────────────────────────────
+        searchInput.oninput = renderJobs;
+        sortSelect.onchange = renderJobs;
+
+        // ── Button Handlers ───────────────────────────────────────────────────
+        saveBtn.onclick = async () => {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '⏳ Applying...';
+
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    keyword: keywordInput.value,
+                    location: locationInput.value,
+                    experience: expInput.value,
+                }),
+            });
+
+            if (isRunning) {
+                await fetch('/api/stop', { method: 'POST' });
+                setTimeout(() => fetch('/api/start', { method: 'POST' }), 2000);
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '💾 Update & Apply';
+            showToast('✅ Settings saved!');
+            setTimeout(fetchJobs, 3000);
+        };
+
+        toggleBtn.onclick = async () => {
+            toggleBtn.disabled = true;
+            if (isRunning) {
+                await fetch('/api/stop', { method: 'POST' });
+                showToast('⏸ Scraper stopped');
+            } else {
+                await fetch('/api/start', { method: 'POST' });
+                showToast('▶ Scraper started');
+            }
+            toggleBtn.disabled = false;
+            setTimeout(fetchStatus, 500);
+        };
+
+        clearBtn.onclick = async () => {
+            if (!confirm('Are you sure you want to clear the database? This will delete all saved jobs from Google Sheets.')) return;
+
+            clearBtn.disabled = true;
+            clearBtn.innerHTML = '⏳ Clearing...';
+            await fetch('/api/clear-db', { method: 'POST' });
+            clearBtn.disabled = false;
+            clearBtn.innerHTML = '🗑 Clear Database';
+            showToast('🗑 Database cleared');
+            fetchJobs();
+        };
+
+        refreshBtn.onclick = () => {
+            fetchJobs();
+            showToast('🔄 Refreshed');
+        };
+
+        // ── Init ──────────────────────────────────────────────────────────────
+        fetchSettings();
+        fetchStatus();
+        fetchJobs();
+
+        setInterval(fetchJobs, 30000);
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>

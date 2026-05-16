@@ -1,0 +1,16 @@
+{
+  "name": "naukri-job-monitor",
+  "version": "1.0.0",
+  "description": "Naukri job scraper with Google Sheets backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "playwright": "^1.44.0",
+    "nodemailer": "^6.9.15",
+    "dotenv": "^16.4.5"
+  }
+}
