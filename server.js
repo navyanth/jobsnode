@@ -9,7 +9,9 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
-const { chromium, firefox } = require('playwright');
+const { chromium } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth')();
+chromium.use(stealth);
 const sheets = require('./sheets');
 const { notify } = require('./notifier');
 
@@ -29,21 +31,22 @@ async function getNaukriHeaders() {
   console.log('\n[Browser] Opening naukri.com to capture headers...');
   let browser;
   try {
-    // We use Playwright's Firefox. Headless Firefox bypasses Naukri's Cloudflare/Akamai
-    // much better than headless Chromium, and it works flawlessly on Render.
-    browser = await firefox.launch({
+    // Use Playwright Extra + Stealth Plugin with Chromium to heavily bypass Cloudflare/Akamai.
+    // This provides a much stronger fingerprint mask on Render than standard Firefox.
+    browser = await chromium.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
       ],
     });
 
-    console.log(`[Browser] Using: Firefox headless`);
+    console.log(`[Browser] Using: Chromium headless (Stealth)`);
 
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       viewport: { width: 1366, height: 768 },
       locale: 'en-US',
       timezoneId: 'Asia/Kolkata',
@@ -184,6 +187,14 @@ async function scrapeOnce(headers) {
       cleanHeaders[k] = v;
     }
   }
+
+  // Print the cURL command for debugging
+  let curlCmd = `curl -X GET "${apiUrl}"`;
+  for (const [k, v] of Object.entries(cleanHeaders)) {
+    const safeVal = v.replace(/'/g, "'\\''"); // Escape single quotes for bash
+    curlCmd += ` -H '${k}: ${safeVal}'`;
+  }
+  console.log(`\n[Scraper] Executing equivalent cURL command:\n${curlCmd}\n`);
 
   let res;
   for (let attempt = 1; attempt <= 3; attempt++) {

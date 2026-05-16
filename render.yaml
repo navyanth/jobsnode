@@ -2,7 +2,7 @@ services:
   - type: web
     name: job-monitor-node
     env: node
-    buildCommand: npm install && npx playwright install firefox
+    buildCommand: npm install && npx playwright install chromium
     startCommand: node server.js
     envVars:
       - key: PLAYWRIGHT_BROWSERS_PATH
