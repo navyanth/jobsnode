@@ -99,14 +99,22 @@ async function getNaukriHeaders() {
 
         console.log('[Browser] Step 3: Scrolling to trigger API calls...');
         for (let i = 0; i < 6; i++) {
-          await page.mouse.wheel(0, 600);
+          try {
+            await page.mouse.wheel(0, 600);
+          } catch (e) {
+            if (e.message.includes('closed')) throw e;
+          }
           await page.waitForTimeout(2000);
         }
 
         await safeGoto('Step 4: Trying experience-filtered URL', 'https://www.naukri.com/java-jobs-in-india?experience=0');
         await page.waitForTimeout(4000);
         for (let i = 0; i < 5; i++) {
-          await page.mouse.wheel(0, 600);
+          try {
+            await page.mouse.wheel(0, 600);
+          } catch (e) {
+            if (e.message.includes('closed')) throw e;
+          }
           await page.waitForTimeout(2000);
         }
       } catch (err) {
