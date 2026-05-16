@@ -75,17 +75,25 @@ async function getNaukriHeaders() {
 
     const runSteps = async () => {
       try {
-        console.log('[Browser] Step 1: Loading homepage...');
-        try {
-          await page.goto('https://www.naukri.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 1 err: ${e.message}`); }
+        const safeGoto = async (step, url) => {
+          for (let i = 1; i <= 3; i++) {
+            try {
+              console.log(`[Browser] ${step} (Attempt ${i})...`);
+              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+              return;
+            } catch (e) {
+              if (e.message.includes('closed')) throw e;
+              console.log(`[Browser] ${step} error: ${e.message}`);
+              await page.waitForTimeout(3000);
+            }
+          }
+        };
+
+        await safeGoto('Step 1: Loading homepage', 'https://www.naukri.com/');
         await page.waitForTimeout(3000);
         console.log(`[Browser] Homepage loaded. Naukri API requests so far: ${requestCount}`);
 
-        console.log('[Browser] Step 2: Loading search page...');
-        try {
-          await page.goto('https://www.naukri.com/java-fresher-jobs', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 2 err: ${e.message}`); }
+        await safeGoto('Step 2: Loading search page', 'https://www.naukri.com/java-fresher-jobs');
         await page.waitForTimeout(3000);
         console.log(`[Browser] Search page loaded. Naukri API requests so far: ${requestCount}`);
 
@@ -95,10 +103,7 @@ async function getNaukriHeaders() {
           await page.waitForTimeout(2000);
         }
 
-        console.log('[Browser] Step 4: Trying experience-filtered URL...');
-        try {
-          await page.goto('https://www.naukri.com/java-jobs-in-india?experience=0', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        } catch(e) { if(e.message.includes('closed')) throw e; console.log(`[Browser] Step 4 err: ${e.message}`); }
+        await safeGoto('Step 4: Trying experience-filtered URL', 'https://www.naukri.com/java-jobs-in-india?experience=0');
         await page.waitForTimeout(4000);
         for (let i = 0; i < 5; i++) {
           await page.mouse.wheel(0, 600);
@@ -168,7 +173,20 @@ async function scrapeOnce(headers) {
     if (!k.startsWith(':')) cleanHeaders[k] = v;
   }
 
-  const res = await fetch(apiUrl, { headers: cleanHeaders, signal: AbortSignal.timeout(15000) });
+  let res;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      res = await fetch(apiUrl, { headers: cleanHeaders, signal: AbortSignal.timeout(30000) });
+      break;
+    } catch (err) {
+      if (err.name === 'TimeoutError' || err.message.includes('timeout')) {
+        console.log(`[Scraper] API fetch timeout (Attempt ${attempt}/3). Retrying...`);
+        if (attempt === 3) throw err;
+      } else {
+        throw err;
+      }
+    }
+  }
 
   if (res.status === 200) {
     const data = await res.json();
@@ -246,7 +264,10 @@ async function runScraperLoop() {
       if (!ok) headers = null; // force refresh next time
     } catch (err) {
       console.log(`[Scraper] Error: ${err.message}`);
-      headers = null;
+      // Do not discard headers on network timeouts, only on auth/fatal errors
+      if (!err.message.includes('timeout') && err.name !== 'TimeoutError') {
+        headers = null;
+      }
     }
 
     // Poll every 60 seconds
