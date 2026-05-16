@@ -9,7 +9,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
-const { chromium } = require('playwright');
+const { chromium, firefox } = require('playwright');
 const sheets = require('./sheets');
 const { notify } = require('./notifier');
 
@@ -29,53 +29,20 @@ async function getNaukriHeaders() {
   console.log('\n[Browser] Opening naukri.com to capture headers...');
   let browser;
   try {
-    // Strategy: try real installed Chrome first (headless) — it bypasses Naukri's
-    // bot detection unlike Playwright's bundled Chromium.
-    // Falls back to bundled Chromium in non-headless mode if Chrome isn't found.
-    const onRender = process.env.RENDER === 'true';
+    // We use Playwright's Firefox. Headless Firefox bypasses Naukri's Cloudflare/Akamai
+    // much better than headless Chromium, and it works flawlessly on Render.
+    browser = await firefox.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+      ],
+    });
 
-    let browser;
-    let launchMode = '';
-
-    // Attempt 1: Real Chrome headless (works on Windows/Mac where Chrome is installed)
-    if (!onRender) {
-      try {
-        browser = await chromium.launch({
-          channel: 'chrome',   // uses the actual installed Google Chrome
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled',
-            '--window-size=1366,768',
-          ],
-        });
-        launchMode = 'real Chrome headless';
-      } catch (_) {
-        // Chrome not installed locally — fall through to non-headless bundled Chromium
-      }
-    }
-
-    // Attempt 2: Bundled Chromium non-headless (visible window, bypasses detection locally)
-    if (!browser) {
-      browser = await chromium.launch({
-        headless: onRender,   // headless on Render (no display), visible locally
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-blink-features=AutomationControlled',
-          '--window-size=1366,768',
-        ],
-      });
-      launchMode = onRender ? 'bundled Chromium headless (Render)' : 'bundled Chromium visible';
-    }
-
-    console.log(`[Browser] Using: ${launchMode}`);
+    console.log(`[Browser] Using: Firefox headless`);
 
     const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       viewport: { width: 1366, height: 768 },
       locale: 'en-US',
       timezoneId: 'Asia/Kolkata',
@@ -83,80 +50,64 @@ async function getNaukriHeaders() {
 
     const page = await context.newPage();
 
-    // Stealth patches
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false });
-      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-      window.chrome = { runtime: {} };
-    });
-
     let capturedHeaders = null;
     let requestCount = 0;
 
-    // Capture nkparam from ANY naukri API request (not just jobapi/v3/search)
+    let headerResolver;
+    const headerPromise = new Promise(resolve => { headerResolver = resolve; });
+
+    // Capture nkparam from ANY naukri API request
     page.on('request', (request) => {
       const url = request.url();
       if (url.includes('naukri.com') && (url.includes('api') || url.includes('jobapi'))) {
         requestCount++;
         const hdrs = request.headers();
         if (hdrs['nkparam']) {
-          console.log(`[Browser] ✅ nkparam found in: ${url.split('?')[0]}`);
-          capturedHeaders = hdrs;
+          if (!capturedHeaders) {
+            console.log(`[Browser] ✅ nkparam found in: ${url.split('?')[0]}`);
+            capturedHeaders = hdrs;
+            headerResolver(hdrs);
+          }
         }
       }
     });
 
-    // Step 1: Homepage
-    console.log('[Browser] Step 1: Loading homepage...');
-    await page.goto('https://www.naukri.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
-    console.log(`[Browser] Homepage loaded. Naukri API requests so far: ${requestCount}`);
-
-    // Step 2: Search URL (networkidle ensures XHR calls complete)
-    if (!capturedHeaders) {
-      console.log('[Browser] Step 2: Loading search page...');
-      await page.goto('https://www.naukri.com/java-fresher-jobs', {
-        waitUntil: 'networkidle',
-        timeout: 60000,
-      });
-      await page.waitForTimeout(3000);
-      console.log(`[Browser] Search page loaded. Naukri API requests so far: ${requestCount}`);
-    }
-
-    // Step 3: Scroll to trigger lazy API calls
-    if (!capturedHeaders) {
-      console.log('[Browser] Step 3: Scrolling to trigger API calls...');
-      for (let i = 0; i < 6 && !capturedHeaders; i++) {
-        await page.mouse.wheel(0, 600);
-        await page.waitForTimeout(2000);
-      }
-    }
-
-    // Step 4: Try alternate experience-filtered URL
-    if (!capturedHeaders) {
-      console.log('[Browser] Step 4: Trying experience-filtered URL...');
-      await page.goto('https://www.naukri.com/java-jobs-in-india?experience=0', {
-        waitUntil: 'networkidle',
-        timeout: 60000,
-      });
-      await page.waitForTimeout(4000);
-      for (let i = 0; i < 5 && !capturedHeaders; i++) {
-        await page.mouse.wheel(0, 600);
-        await page.waitForTimeout(2000);
-      }
-    }
-
-    // Step 5: Trigger search via keyboard
-    if (!capturedHeaders) {
-      console.log('[Browser] Step 5: Triggering search via search input...');
+    const runSteps = async () => {
       try {
-        const searchInput = page.locator('input[placeholder*="Skills"], input[placeholder*="Job"], #qp').first();
-        await searchInput.fill('java fresher', { timeout: 5000 });
-        await page.keyboard.press('Enter');
-        await page.waitForTimeout(5000);
-      } catch (_) { /* search box may not be found, continue */ }
-    }
+        console.log('[Browser] Step 1: Loading homepage...');
+        await page.goto('https://www.naukri.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForTimeout(3000);
+        console.log(`[Browser] Homepage loaded. Naukri API requests so far: ${requestCount}`);
+
+        console.log('[Browser] Step 2: Loading search page...');
+        await page.goto('https://www.naukri.com/java-fresher-jobs', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForTimeout(3000);
+        console.log(`[Browser] Search page loaded. Naukri API requests so far: ${requestCount}`);
+
+        console.log('[Browser] Step 3: Scrolling to trigger API calls...');
+        for (let i = 0; i < 6; i++) {
+          await page.mouse.wheel(0, 600);
+          await page.waitForTimeout(2000);
+        }
+
+        console.log('[Browser] Step 4: Trying experience-filtered URL...');
+        await page.goto('https://www.naukri.com/java-jobs-in-india?experience=0', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForTimeout(4000);
+        for (let i = 0; i < 5; i++) {
+          await page.mouse.wheel(0, 600);
+          await page.waitForTimeout(2000);
+        }
+      } catch (err) {
+        // Ignore "Target closed" or "context closed" errors, which happen 
+        // when we successfully find the headers and close the browser early.
+        if (!err.message.includes('closed')) {
+          console.log(`[Browser] Navigation error: ${err.message}`);
+        }
+      }
+    };
+
+    // Wait for either the headers to be captured, or for all navigation steps to complete
+    await Promise.race([headerPromise, runSteps()]);
 
     await browser.close();
     browser = null;
@@ -165,7 +116,6 @@ async function getNaukriHeaders() {
       console.log('[Browser] ✅ Headers captured successfully.');
     } else {
       console.log(`[Browser] ❌ Header capture failed. Total naukri API requests seen: ${requestCount}`);
-      console.log('[Browser]    Naukri may be blocking headless Chrome. Retrying...');
     }
 
     return capturedHeaders;
