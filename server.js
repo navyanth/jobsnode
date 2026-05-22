@@ -358,10 +358,42 @@ app.post('/api/clear-db', async (req, res) => {
   }
 });
 
+// ── Health Check API ─────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Fallback — serve index.html for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// ── Self-Ping / Health Check Ping ─────────────────────────────────────────────
+function startSelfPing() {
+  const baseUrl = process.env.BASE_URL;
+  const intervalSec = parseInt(process.env.HEALTH_CHECK_INTERVAL, 10) || 20; // default 20 seconds
+  const intervalMs = intervalSec * 1000;
+
+  if (!baseUrl) {
+    console.log('[Health Check] BASE_URL not configured. Self-ping disabled.');
+    return;
+  }
+
+  console.log(`[Health Check] Self-ping active. Target: ${baseUrl}/api/health every ${intervalSec}s`);
+
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/health`);
+      if (res.ok) {
+        console.log(`[Health Check] ✅ Self-ping successful: ${res.status}`);
+      } else {
+        console.log(`[Health Check] ⚠️ Self-ping failed with status: ${res.status}`);
+      }
+    } catch (err) {
+      console.log(`[Health Check] ❌ Self-ping error: ${err.message}`);
+    }
+  }, intervalMs);
+}
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -375,6 +407,8 @@ async function main() {
       console.log(`\n🚀 Server running on http://localhost:${PORT}\n`);
       // Auto-start scraper
       runScraperLoop();
+      // Start self-ping health check
+      startSelfPing();
     });
   } catch (err) {
     console.error('Fatal startup error:', err);
@@ -383,3 +417,4 @@ async function main() {
 }
 
 main();
+
