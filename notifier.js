@@ -26,26 +26,40 @@ async function sendTelegram(job) {
     `🔗 <a href="${job.url}">View Job</a>\n\n` +
     `<i>Powered by Job Monitor</i>`;
 
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    });
+  let messages = [message];
+  if (job.isWalkin) {
+    messages.push(
+      `🚨🚨 <b>WALK-IN OPPORTUNITY DETECTED!</b> 🚨🚨\n\n` +
+      `💼 <b>${job.title}</b>\n` +
+      `🏢 ${job.company}\n` +
+      `📍 ${job.location}\n` +
+      `🔗 <a href="${job.url}">View Job</a>\n\n` +
+      `<i>Don't miss this walk-in drive!</i>`
+    );
+  }
 
-    if (res.ok) {
-      console.log(`[Notifier] Telegram sent → ${job.title} @ ${job.company}`);
-    } else {
-      const text = await res.text();
-      console.log(`[Notifier] Telegram failed (${res.status}): ${text}`);
+  for (const msg of messages) {
+    try {
+      const url = `https://api.telegram.org/bot${token}/sendMessage`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: msg,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`[Notifier] Telegram sent → ${job.title} @ ${job.company}`);
+      } else {
+        const text = await res.text();
+        console.log(`[Notifier] Telegram failed (${res.status}): ${text}`);
+      }
+    } catch (err) {
+      console.log(`[Notifier] Telegram error: ${err.message}`);
     }
-  } catch (err) {
-    console.log(`[Notifier] Telegram error: ${err.message}`);
   }
 }
 

@@ -236,6 +236,8 @@ async function scrapeOnce(headers) {
           jobDate = new Date(job.createdDate).toISOString();
         }
 
+        const isWalkin = JSON.stringify(job).toLowerCase().includes('walkin');
+
         const jobData = {
           title,
           company,
@@ -243,7 +245,8 @@ async function scrapeOnce(headers) {
           url,
           source: 'naukri',
           hash,
-          date: jobDate
+          date: jobDate,
+          isWalkin
         };
 
         console.log(`      -> NEW: ${title} @ ${company} (Created: ${jobDate})`);
