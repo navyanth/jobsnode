@@ -297,7 +297,8 @@ async function runScraperLoop() {
     }
 
     // Poll every 60 seconds
-    scraperTimer = setTimeout(tick, 5000);
+    const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 300) * 1000;
+    scraperTimer = setTimeout(tick, intervalMs);
   };
 
   tick();
