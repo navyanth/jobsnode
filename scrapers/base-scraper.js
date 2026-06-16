@@ -10,6 +10,13 @@ async function launchBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
+      '--memory-pressure-off',
+      '--disable-component-extensions-with-background-pages',
+      '--disable-background-networking',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--max_old_space_size=256',
     ],
   });
 }
