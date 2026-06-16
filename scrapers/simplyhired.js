@@ -55,6 +55,7 @@ async function scrape() {
 
       if (res.status !== 200) {
         console.log(`[SimplyHired] Got ${res.status} from search page.`);
+        console.log(`[SimplyHired] curl -v "${pageUrl}" -H "user-agent: ${headers['user-agent']}" -H "accept: ${headers['accept']}" -H "accept-language: ${headers['accept-language']}" -H "referer: ${headers['referer']}"`);
         return false;
       }
 
