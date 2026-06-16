@@ -93,7 +93,7 @@ function makeWalkinRe() {
 }
 
 module.exports = {
-  launchBrowser,
+  launchBrowser: launchFresh,
   acquireBrowser,
   releaseBrowser,
   newPage,
