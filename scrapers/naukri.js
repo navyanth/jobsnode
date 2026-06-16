@@ -119,6 +119,22 @@ async function scrape(headers) {
 
   const cleaned = cleanHeaders(headers);
 
+  // ensure critical Naukri headers even if Playwright missed them
+  const naukriDefaults = {
+    'appid': '109',
+    'systemid': 'Naukri',
+    'clientid': 'd3skt0p',
+    'gid': 'LOCATION,INDUSTRY,EDUCATION,FAREA_ROLE',
+    'accept': 'application/json',
+    'content-type': 'application/json',
+    'referer': 'https://www.naukri.com/java-fresher-jobs',
+  };
+  for (const [k, v] of Object.entries(naukriDefaults)) {
+    if (!cleaned[k]) cleaned[k] = v;
+  }
+
+  console.log(`[Naukri] nkparam: ${cleaned['nkparam'] ? '✓ present' : '✗ MISSING'}`);
+  console.log(`[Naukri] appid: ${cleaned['appid']}, systemid: ${cleaned['systemid']}, clientid: ${cleaned['clientid']}`);
   let curlCmd = `curl -X GET "${apiUrl}"`;
   for (const [k, v] of Object.entries(cleaned)) {
     const safeVal = v.replace(/'/g, "'\\''");
