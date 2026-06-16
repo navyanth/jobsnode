@@ -73,7 +73,6 @@ async function sendEmail(job) {
   const password = process.env.EMAIL_PASSWORD;
   const recipient = process.env.EMAIL_RECIPIENT;
   const smtpServer = process.env.SMTP_SERVER || 'smtp.gmail.com';
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
 
   if (!sender || !password || !recipient) {
     console.log('[Notifier] Email credentials not set — skipping.');
@@ -96,25 +95,32 @@ async function sendEmail(job) {
     </div>
   `;
 
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtpServer,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: sender, pass: password },
-    });
+  const ports = [587, 465];
+  for (const port of ports) {
+    try {
+      console.log(`[Notifier] Trying SMTP ${smtpServer}:${port}...`);
+      const transporter = nodemailer.createTransport({
+        host: smtpServer,
+        port,
+        secure: port === 465,
+        auth: { user: sender, pass: password },
+        connectionTimeout: 10000,
+      });
 
-    await transporter.sendMail({
-      from: sender,
-      to: recipient,
-      subject: `🆕 New Job: ${job.title} @ ${job.company}`,
-      html,
-    });
+      await transporter.sendMail({
+        from: sender,
+        to: recipient,
+        subject: `🆕 New Job: ${job.title} @ ${job.company}`,
+        html,
+      });
 
-    console.log(`[Notifier] Email sent → ${job.title} @ ${job.company}`);
-  } catch (err) {
-    console.log(`[Notifier] Email error: ${err.message}`);
+      console.log(`[Notifier] Email sent via ${smtpServer}:${port} → ${job.title} @ ${job.company}`);
+      return;
+    } catch (err) {
+      console.log(`[Notifier] SMTP ${smtpServer}:${port} failed: ${err.message}`);
+    }
   }
+  console.log('[Notifier] All SMTP attempts exhausted.');
 }
 
 // ── Combined ──────────────────────────────────────────────────────────────────
