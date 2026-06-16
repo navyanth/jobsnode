@@ -131,6 +131,37 @@ async function saveSettings(settings) {
   console.log(`[Sheets] Settings updated: ${JSON.stringify(settingsCache)}`);
 }
 
+// ── Per-Scraper Settings ──────────────────────────────────────────────────────
+
+function getScraperSettings(name) {
+  const prefix = `${name}_`;
+  const result = {};
+  const unprefixedKeys = new Set();
+  for (const [key, val] of Object.entries(settingsCache)) {
+    if (key.startsWith(prefix)) {
+      const unprefixed = key.slice(prefix.length);
+      result[unprefixed] = val;
+      unprefixedKeys.add(unprefixed);
+    }
+  }
+  for (const [key, val] of Object.entries(settingsCache)) {
+    if (!key.startsWith(`${name}_`) && !key.includes('_') && !unprefixedKeys.has(key)) {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+async function saveScraperSettings(name, settings) {
+  const prefixed = {};
+  for (const [key, val] of Object.entries(settings)) {
+    prefixed[`${name}_${key}`] = val;
+  }
+  settingsCache = { ...settingsCache, ...prefixed };
+  await scriptPost({ action: 'saveSettings', settings: prefixed });
+  console.log(`[Sheets] Settings for '${name}' updated: ${JSON.stringify(settings)}`);
+}
+
 module.exports = {
   init,
   makeHash,
@@ -141,4 +172,6 @@ module.exports = {
   getSettings,
   loadSettings,
   saveSettings,
+  getScraperSettings,
+  saveScraperSettings,
 };
