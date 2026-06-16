@@ -85,6 +85,37 @@ app.get('/api/scrapers', (req, res) => {
   res.json(scraperManager.getStatus());
 });
 
+app.get('/api/scrapers/settings', (req, res) => {
+  const scrapers = scraperManager.getScrapers();
+  const result = scrapers.map(s => {
+    const merged = { ...s.defaultSettings, ...sheets.getScraperSettings(s.name) };
+    for (const key of Object.keys(s.defaultSettings)) {
+      if (merged[key] === '') merged[key] = s.defaultSettings[key];
+    }
+    return {
+      name: s.name,
+      running: s.running,
+      settings: merged,
+      settingsSchema: s.settingsSchema,
+    };
+  });
+  res.json(result);
+});
+
+app.get('/api/settings/:name', (req, res) => {
+  const settings = sheets.getScraperSettings(req.params.name);
+  res.json(settings);
+});
+
+app.post('/api/settings/:name', async (req, res) => {
+  try {
+    await sheets.saveScraperSettings(req.params.name, req.body);
+    res.json({ status: 'success' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/scrapers/:name/start', (req, res) => {
   scraperManager.start(req.params.name);
   res.json({ status: 'started' });

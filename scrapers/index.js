@@ -1,5 +1,6 @@
 const naukri = require('./naukri');
 const indeed = require('./indeed');
+const sheets = require('../sheets');
 
 const registered = [naukri, indeed];
 
@@ -22,6 +23,8 @@ function getScrapers() {
   return registered.map(s => ({
     name: s.name,
     running: state[s.name]?.running || false,
+    defaultSettings: s.getDefaultSettings ? s.getDefaultSettings() : {},
+    settingsSchema: s.getSettingsSchema ? s.getSettingsSchema() : null,
   }));
 }
 
@@ -41,6 +44,14 @@ async function tick(scraper) {
   const st = state[scraper.name];
   if (!st || st.stopRequested) {
     if (st) st.running = false;
+    return;
+  }
+
+  const sSettings = sheets.getScraperSettings(scraper.name);
+  if (sSettings.enabled === '0') {
+    console.log(`[Manager] ${scraper.name}: disabled via settings, skipping.`);
+    const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 300) * 1000;
+    st.timer = setTimeout(() => tick(scraper), intervalMs);
     return;
   }
 

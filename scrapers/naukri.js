@@ -4,7 +4,7 @@ const { notify } = require('../notifier');
 const { launchBrowser, safeGoto, cleanHeaders, fetchWithRetry, makeWalkinRe } = require('./base-scraper');
 
 const NAME = 'naukri';
-const DEFAULT_SETTINGS = { keyword: 'java fresher', location: 'india', experience: '0' };
+const DEFAULT_SETTINGS = { enabled: '1', keyword: 'java fresher', location: 'india', experience: '0' };
 
 async function getHeaders() {
   console.log('\n[Naukri] Opening naukri.com to capture headers...');

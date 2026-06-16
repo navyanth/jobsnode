@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Naukri Job Scraper Dashboard</title>
+    <title>Job Monitor Dashboard</title>
     <meta name="description"
-        content="Real-time Naukri job discovery engine — monitor new job listings with automated scraping and notifications.">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+        content="Multi-source job discovery engine — monitor new job listings with automated scraping and notifications.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #020617;
@@ -36,7 +36,7 @@
                 radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.05) 0%, transparent 40%);
             color: var(--text-primary);
             min-height: 100vh;
-            padding: 2rem;
+            padding: 1.5rem 2rem 2rem;
             line-height: 1.5;
         }
 
@@ -49,11 +49,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 3rem;
+            margin-bottom: 1.5rem;
         }
 
         .logo-section h1 {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 700;
             background: linear-gradient(135deg, #38bdf8, #818cf8);
             -webkit-background-clip: text;
@@ -63,7 +63,7 @@
 
         .logo-section p {
             color: var(--text-secondary);
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
 
         .header-badges {
@@ -124,10 +124,78 @@
             animation: none;
         }
 
+        .tab-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.25rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-bar::-webkit-scrollbar {
+            height: 4px;
+        }
+        .tab-bar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .tab-bar::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            white-space: nowrap;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tab-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .tab-dot.running {
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .tab-dot.stopped {
+            background: var(--danger);
+        }
+
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 2rem;
+            grid-template-columns: 340px 1fr;
+            gap: 1.5rem;
         }
 
         .settings-card {
@@ -135,27 +203,36 @@
             backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
-            padding: 2rem;
+            padding: 1.5rem;
             height: fit-content;
             position: sticky;
-            top: 2rem;
+            top: 1.5rem;
         }
 
         .settings-card h2 {
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
             color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .settings-card .scraper-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
         }
 
         .input-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
 
         .input-group label {
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.35rem;
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
         }
 
@@ -163,11 +240,11 @@
             width: 100%;
             background: rgba(15, 23, 42, 0.5);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            padding: 0.65rem 0.9rem;
             color: var(--text-primary);
             font-family: inherit;
-            font-size: 1rem;
+            font-size: 0.9rem;
             transition: all 0.2s;
         }
 
@@ -177,20 +254,26 @@
             box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1);
         }
 
+        .btn-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
         .btn {
-            width: 100%;
-            padding: 0.75rem 1.5rem;
-            border-radius: 12px;
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
             border: none;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .btn:active {
@@ -204,65 +287,88 @@
 
         .btn-primary:hover {
             background: var(--accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.25);
         }
 
         .btn-secondary {
             background: var(--card-bg);
             border: 1px solid var(--border);
             color: var(--text-primary);
-            margin-top: 1rem;
         }
 
         .btn-secondary:hover {
             background: rgba(51, 65, 85, 0.8);
         }
 
+        .btn-start {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+        }
+
+        .btn-start:hover {
+            background: rgba(34, 197, 94, 0.25);
+        }
+
+        .btn-stop {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-stop:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
         .btn-danger {
             background: var(--card-bg);
             border: 1px solid var(--danger);
             color: var(--danger);
-            margin-top: 1rem;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.15);
         }
 
         .jobs-header-row {
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
         }
 
         .jobs-header-row h2 {
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
         }
 
         .jobs-controls {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
         }
 
         .search-box {
             flex: 1;
-            min-width: 200px;
+            min-width: 160px;
         }
 
         .search-box input {
             width: 100%;
             background: var(--card-bg);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            padding: 0.55rem 0.9rem;
             color: var(--text-primary);
             font-family: inherit;
+            font-size: 0.85rem;
         }
 
-        .sort-select {
+        .filter-select {
             background: var(--card-bg);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            padding: 0.55rem 0.9rem;
             color: var(--text-primary);
             font-family: inherit;
+            font-size: 0.85rem;
             cursor: pointer;
             outline: none;
         }
@@ -270,12 +376,12 @@
         .jobs-header-right {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             margin-left: auto;
         }
 
         .job-count {
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
             font-weight: 400;
         }
@@ -285,7 +391,7 @@
             border: none;
             color: var(--accent);
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             font-weight: 600;
             text-decoration: underline;
             font-family: inherit;
@@ -299,15 +405,15 @@
         .job-list {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.85rem;
         }
 
         .job-card {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 1.5rem;
+            border-radius: 18px;
+            padding: 1.25rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -319,9 +425,8 @@
         @keyframes slideIn {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(16px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -329,46 +434,80 @@
         }
 
         .job-card:hover {
-            transform: scale(1.02);
+            transform: scale(1.01);
             border-color: var(--accent);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 16px 24px -4px rgba(0, 0, 0, 0.2);
         }
 
         .job-info h3 {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
         }
 
         .job-info .company {
             color: var(--text-secondary);
             font-weight: 500;
-            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
         }
 
         .job-meta {
             display: flex;
-            gap: 1.5rem;
-            font-size: 0.875rem;
+            gap: 1.25rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         .job-meta span {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.3rem;
+        }
+
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .source-badge.naukri {
+            background: rgba(249, 115, 22, 0.15);
+            color: #fb923c;
+        }
+
+        .source-badge.indeed {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+        }
+
+        .source-badge.linkedin {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .source-badge.default {
+            background: rgba(148, 163, 184, 0.15);
+            color: #94a3b8;
         }
 
         .view-job-btn {
             background: rgba(56, 189, 248, 0.1);
             color: var(--accent);
-            padding: 0.5rem 1rem;
+            padding: 0.45rem 0.9rem;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             transition: all 0.2s;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .view-job-btn:hover {
@@ -378,28 +517,28 @@
 
         .empty-state {
             text-align: center;
-            padding: 4rem;
+            padding: 3rem 2rem;
             color: var(--text-secondary);
             background: var(--card-bg);
-            border-radius: 24px;
+            border-radius: 20px;
             border: 1px dashed var(--border);
         }
 
         .empty-state .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
         }
 
         .toast {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
+            bottom: 1.5rem;
+            right: 1.5rem;
             background: var(--card-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: 12px;
-            padding: 0.85rem 1.5rem;
-            font-size: 0.9rem;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.85rem;
             color: var(--text-primary);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             transform: translateY(120%);
@@ -409,6 +548,10 @@
 
         .toast.show {
             transform: translateY(0);
+        }
+
+        .hidden {
+            display: none !important;
         }
 
         @media (max-width: 900px) {
@@ -428,21 +571,35 @@
             header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 1rem;
+                gap: 0.75rem;
             }
 
             .logo-section h1 {
-                font-size: 2rem;
+                font-size: 1.6rem;
             }
 
             .job-card {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 1rem;
+                gap: 0.75rem;
             }
 
             .view-job-btn {
                 align-self: flex-end;
+            }
+
+            .btn-row {
+                flex-direction: column;
+            }
+
+            .jobs-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .jobs-header-right {
+                margin-left: 0;
+                justify-content: space-between;
             }
         }
     </style>
@@ -452,37 +609,34 @@
     <div class="container">
         <header>
             <div class="logo-section">
-                <h1>Naukri Scraper</h1>
-                <p>Real-time job discovery engine</p>
+                <h1>Job Monitor</h1>
+                <p>Multi-source job discovery engine</p>
             </div>
             <div class="header-badges">
-                <div class="sheets-badge">📊 Google Sheets DB</div>
+                <div class="sheets-badge">&#x1F4CA; Google Sheets DB</div>
                 <div class="status-badge">
-                    <div id="statusDot" class="status-dot"></div>
-                    <span id="statusText">Running</span>
+                    <div id="globalStatusDot" class="status-dot"></div>
+                    <span id="globalStatusText">Loading...</span>
                 </div>
             </div>
         </header>
 
-        <div class="dashboard-grid">
-            <aside class="settings-card">
-                <h2>⚙️ Configuration</h2>
-                <div class="input-group">
-                    <label for="keywordInput">Keyword</label>
-                    <input type="text" id="keywordInput" placeholder="e.g. java fresher">
-                </div>
-                <div class="input-group">
-                    <label for="locationInput">Location</label>
-                    <input type="text" id="locationInput" placeholder="e.g. india">
-                </div>
-                <div class="input-group">
-                    <label for="expInput">Experience (Years)</label>
-                    <input type="text" id="expInput" placeholder="e.g. 0">
-                </div>
+        <div id="tabBar" class="tab-bar">
+            <div class="empty-state" style="padding:0.6rem 1.2rem;font-size:0.85rem;border-style:solid;">
+                &#x23F3; Loading scrapers...
+            </div>
+        </div>
 
-                <button id="saveBtn" class="btn btn-primary">💾 Update & Apply</button>
-                <button id="toggleBtn" class="btn btn-secondary">⏸ Stop Scraper</button>
-                <button id="clearBtn" class="btn btn-danger">🗑 Clear Database</button>
+        <div class="dashboard-grid">
+            <aside id="settingsCard" class="settings-card hidden">
+                <h2>&#x2699;&#xFE0F; <span id="settingsTitle">Configuration</span></h2>
+                <div id="settingsSubtitle" class="scraper-subtitle">Configure search parameters</div>
+                <div id="settingsFields"></div>
+                <div class="btn-row">
+                    <button id="toggleScraperBtn" class="btn btn-start">&#x25B6; Start</button>
+                    <button id="saveSettingsBtn" class="btn btn-primary">&#x1F4BE; Save</button>
+                </div>
+                <button id="clearBtn" class="btn btn-danger" style="width:100%;margin-top:0.75rem;">&#x1F5D1; Clear Database</button>
             </aside>
 
             <main class="jobs-section">
@@ -490,23 +644,26 @@
                     <h2>Latest Jobs Found</h2>
                     <div class="jobs-controls">
                         <div class="search-box">
-                            <input type="text" id="searchInput" placeholder="🔍 Search in results...">
+                            <input type="text" id="searchInput" placeholder="&#x1F50D; Search in results...">
                         </div>
-                        <select id="sortSelect" class="sort-select">
-                            <option value="date-desc">📅 Newest First</option>
-                            <option value="date-asc">📅 Oldest First</option>
-                            <option value="title-asc">🔤 Title (A-Z)</option>
-                            <option value="company-asc">🏢 Company (A-Z)</option>
+                        <select id="sourceFilter" class="filter-select">
+                            <option value="all">&#x1F30D; All Sources</option>
+                        </select>
+                        <select id="sortSelect" class="filter-select">
+                            <option value="date-desc">&#x1F4C5; Newest</option>
+                            <option value="date-asc">&#x1F4C5; Oldest</option>
+                            <option value="title-asc">&#x1F524; Title A-Z</option>
+                            <option value="company-asc">&#x1F3E2; Company A-Z</option>
                         </select>
                         <div class="jobs-header-right">
                             <span id="jobCount" class="job-count"></span>
-                            <button id="refreshBtn" class="refresh-btn">↻ Refresh</button>
+                            <button id="refreshBtn" class="refresh-btn">&#x21BB; Refresh</button>
                         </div>
                     </div>
                 </div>
                 <div id="jobList" class="job-list">
                     <div class="empty-state">
-                        <div class="icon">⏳</div>
+                        <div class="icon">&#x23F3;</div>
                         Loading jobs...
                     </div>
                 </div>
@@ -518,22 +675,33 @@
 
     <script>
         const $ = id => document.getElementById(id);
-        const keywordInput = $('keywordInput');
-        const locationInput = $('locationInput');
-        const expInput = $('expInput');
-        const saveBtn = $('saveBtn');
-        const toggleBtn = $('toggleBtn');
+        const tabBar = $('tabBar');
+        const settingsCard = $('settingsCard');
+        const settingsTitle = $('settingsTitle');
+        const settingsSubtitle = $('settingsSubtitle');
+        const settingsFields = $('settingsFields');
+        const toggleScraperBtn = $('toggleScraperBtn');
+        const saveSettingsBtn = $('saveSettingsBtn');
         const clearBtn = $('clearBtn');
         const searchInput = $('searchInput');
+        const sourceFilter = $('sourceFilter');
         const sortSelect = $('sortSelect');
         const jobList = $('jobList');
         const jobCount = $('jobCount');
-        const statusDot = $('statusDot');
-        const statusText = $('statusText');
+        const globalStatusDot = $('globalStatusDot');
+        const globalStatusText = $('globalStatusText');
         const toastEl = $('toast');
 
-        let isRunning = false;
-        let allJobs = []; // Store fetched jobs locally
+        let scrapers = [];
+        let selectedScraper = null;
+        let allJobs = [];
+        let isGlobalRunning = false;
+
+        const SOURCE_COLORS = {
+            naukri: '#fb923c',
+            indeed: '#38bdf8',
+            linkedin: '#60a5fa',
+        };
 
         // ── Toast ─────────────────────────────────────────────────────────────
         function showToast(msg, duration = 3000) {
@@ -542,43 +710,108 @@
             setTimeout(() => toastEl.classList.remove('show'), duration);
         }
 
-        // ── API Helpers ───────────────────────────────────────────────────────
-        async function fetchSettings() {
+        // ── API ────────────────────────────────────────────────────────────────
+        async function fetchScrapers() {
             try {
-                const res = await fetch('/api/settings');
-                const data = await res.json();
-                keywordInput.value = data.keyword || '';
-                locationInput.value = data.location || '';
-                expInput.value = data.experience || '0';
+                const res = await fetch('/api/scrapers/settings');
+                scrapers = await res.json();
+                renderTabs();
+                if (!selectedScraper && scrapers.length) selectScraper(scrapers[0].name);
+                // Keep selected scraper in sync with latest state
+                if (selectedScraper) {
+                    const updated = scrapers.find(s => s.name === selectedScraper.name);
+                    if (updated) {
+                        selectedScraper = updated;
+                        updateToggleBtn(updated);
+                    }
+                }
+                return scrapers;
             } catch (err) {
-                console.error('Failed to fetch settings:', err);
+                console.error('Failed to fetch scrapers:', err);
+                return [];
             }
+        }
+
+        function renderTabs() {
+            tabBar.innerHTML = scrapers.map(s => `
+                <button class="tab-btn${s.name === selectedScraper?.name ? ' active' : ''}"
+                        data-name="${s.name}">
+                    <span class="tab-dot ${s.running ? 'running' : 'stopped'}"></span>
+                    ${capitalize(s.name)}
+                </button>
+            `).join('');
+
+            tabBar.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.onclick = () => selectScraper(btn.dataset.name);
+            });
+        }
+
+        function selectScraper(name) {
+            const s = scrapers.find(x => x.name === name);
+            if (!s) return;
+            selectedScraper = s;
+
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.name === name);
+            });
+
+            settingsCard.classList.remove('hidden');
+            settingsTitle.textContent = capitalize(s.name) + ' Configuration';
+            settingsSubtitle.textContent = 'Configure search parameters for ' + capitalize(s.name);
+
+            const fields = s.settings || {};
+            const schema = s.settingsSchema || [];
+
+            function renderField(key, val, label, type, opts) {
+                if (type === 'select') {
+                    const optHtml = (opts || []).map(o =>
+                        `<option value="${escapeHtml(o.value)}"${String(val) === String(o.value) ? ' selected' : ''}>${escapeHtml(o.label)}</option>`
+                    ).join('');
+                    return `
+                        <div class="input-group">
+                            <label for="field_${key}">${escapeHtml(label || capitalize(key))}</label>
+                            <select id="field_${key}" class="filter-select" style="width:100%">${optHtml}</select>
+                        </div>`;
+                }
+                return `
+                    <div class="input-group">
+                        <label for="field_${key}">${escapeHtml(label || capitalize(key))}</label>
+                        <input type="text" id="field_${key}" value="${escapeHtml(String(val))}" placeholder="${escapeHtml(label ? 'e.g. ' + key : 'e.g. ' + key)}">
+                    </div>`;
+            }
+
+            settingsFields.innerHTML = schema.length
+                ? schema.map(f => renderField(f.key, fields[f.key], f.label, f.type, f.options)).join('')
+                : Object.entries(fields).map(([key, val]) =>
+                    key === 'enabled'
+                        ? renderField(key, val, 'Enabled', 'select', [{ value: '1', label: 'Yes' }, { value: '0', label: 'No' }])
+                        : renderField(key, val)
+                ).join('');
+
+            updateToggleBtn(s);
         }
 
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                isRunning = data.status === 'running';
-                updateStatusUI();
+                isGlobalRunning = data.status === 'running';
+                globalStatusDot.classList.toggle('stopped', !isGlobalRunning);
+                globalStatusText.textContent = isGlobalRunning ? 'Running' : 'Stopped';
             } catch (err) {
                 console.error('Failed to fetch status:', err);
             }
         }
 
-        function updateStatusUI() {
-            if (isRunning) {
-                statusDot.classList.remove('stopped');
-                statusText.innerText = 'Running';
-                toggleBtn.innerHTML = '⏸ Stop Scraper';
-                toggleBtn.classList.remove('btn-primary');
-                toggleBtn.classList.add('btn-secondary');
+        function updateToggleBtn(scraper) {
+            const s = scraper || selectedScraper;
+            if (!s) return;
+            if (s.running) {
+                toggleScraperBtn.innerHTML = '&#x23F8;&#xFE0F; Stop';
+                toggleScraperBtn.className = 'btn btn-stop';
             } else {
-                statusDot.classList.add('stopped');
-                statusText.innerText = 'Stopped';
-                toggleBtn.innerHTML = '▶ Start Scraper';
-                toggleBtn.classList.remove('btn-secondary');
-                toggleBtn.classList.add('btn-primary');
+                toggleScraperBtn.innerHTML = '&#x25B6; Start';
+                toggleScraperBtn.className = 'btn btn-start';
             }
         }
 
@@ -595,31 +828,31 @@
         function renderJobs() {
             const query = searchInput.value.toLowerCase();
             const sortBy = sortSelect.value;
+            const sourceVal = sourceFilter.value;
 
-            // 1. Filter
             let filtered = allJobs.filter(job => {
                 const title = (job.title || '').toLowerCase();
                 const company = (job.company || '').toLowerCase();
-                return title.includes(query) || company.includes(query);
+                const matchesSearch = title.includes(query) || company.includes(query);
+                const matchesSource = sourceVal === 'all' || (job.source || '').toLowerCase() === sourceVal;
+                return matchesSearch && matchesSource;
             });
 
-            // 2. Sort
             filtered.sort((a, b) => {
-                if (sortBy === 'date-desc') return new Date(b.date || b.seen_at) - new Date(a.date || a.seen_at);
-                if (sortBy === 'date-asc') return new Date(a.date || a.seen_at) - new Date(b.date || b.seen_at);
+                if (sortBy === 'date-desc') return new Date(b.date || b.seen_at || 0) - new Date(a.date || a.seen_at || 0);
+                if (sortBy === 'date-asc') return new Date(a.date || a.seen_at || 0) - new Date(b.date || b.seen_at || 0);
                 if (sortBy === 'title-asc') return (a.title || '').localeCompare(b.title || '');
                 if (sortBy === 'company-asc') return (a.company || '').localeCompare(b.company || '');
                 return 0;
             });
 
-            // 3. Render
             jobCount.textContent = `${filtered.length} job${filtered.length !== 1 ? 's' : ''}`;
 
             if (filtered.length === 0) {
                 jobList.innerHTML = `
                     <div class="empty-state">
-                        <div class="icon">🔍</div>
-                        No matches found.
+                        <div class="icon">${allJobs.length ? '&#x1F50D;' : '&#x23F3;'}</div>
+                        ${allJobs.length ? 'No matches found.' : 'No jobs yet. Start scraping to collect jobs.'}
                     </div>`;
                 return;
             }
@@ -630,23 +863,44 @@
                 const location = job.location || 'Remote/India';
                 const date = job.date || job.seen_at || job.timestamp || '';
                 const url = job.url || '#';
-                const source = job.source || 'Naukri';
+                const source = (job.source || 'unknown').toLowerCase();
+                const colorClass = SOURCE_COLORS[source] ? source : 'default';
 
                 return `
-                    <div class="job-card" style="animation-delay: ${index * 0.04}s">
+                    <div class="job-card" style="animation-delay: ${(index % 20) * 0.04}s">
                         <div class="job-info">
                             <h3>${escapeHtml(title)}</h3>
                             <div class="company">${escapeHtml(company)}</div>
                             <div class="job-meta">
-                                <span>📍 ${escapeHtml(location)}</span>
-                                <span>📅 ${formatDate(date)}</span>
-                                <span>🟠 ${escapeHtml(source)}</span>
+                                <span>&#x1F4CD; ${escapeHtml(location)}</span>
+                                <span>&#x1F4C5; ${formatDate(date)}</span>
+                                <span class="source-badge ${colorClass}">${capitalize(source)}</span>
                             </div>
                         </div>
-                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="view-job-btn">View Job →</a>
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="view-job-btn">View &#x2192;</a>
                     </div>
                 `;
             }).join('');
+        }
+
+        function populateSourceFilter() {
+            const sources = new Set();
+            allJobs.forEach(j => {
+                const src = (j.source || 'unknown').toLowerCase();
+                if (src) sources.add(src);
+            });
+            const prev = sourceFilter.value;
+            const prevExists = [...sources].some(s => s === prev);
+            sourceFilter.innerHTML = '<option value="all">&#x1F30D; All Sources</option>';
+            [...sources].sort().forEach(s => {
+                sourceFilter.innerHTML += `<option value="${s}">${capitalize(s)}</option>`;
+            });
+            sourceFilter.value = prevExists ? prev : 'all';
+        }
+
+        function capitalize(str) {
+            if (!str) return '';
+            return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
         function escapeHtml(str) {
@@ -655,7 +909,7 @@
         }
 
         function formatDate(iso) {
-            if (!iso) return '—';
+            if (!iso) return '&mdash;';
             try {
                 const d = new Date(iso);
                 return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -664,73 +918,79 @@
             }
         }
 
-        // ── Input Event Listeners ─────────────────────────────────────────────
+        // ── Input Events ──────────────────────────────────────────────────────
         searchInput.oninput = renderJobs;
         sortSelect.onchange = renderJobs;
+        sourceFilter.onchange = renderJobs;
 
-        // ── Button Handlers ───────────────────────────────────────────────────
-        saveBtn.onclick = async () => {
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '⏳ Applying...';
+        // ── Button Handlers ────────────────────────────────────────────────────
+        toggleScraperBtn.onclick = async () => {
+            if (!selectedScraper) return;
+            toggleScraperBtn.disabled = true;
+            const name = selectedScraper.name;
 
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    keyword: keywordInput.value,
-                    location: locationInput.value,
-                    experience: expInput.value,
-                }),
-            });
-
-            if (isRunning) {
-                await fetch('/api/stop', { method: 'POST' });
-                setTimeout(() => fetch('/api/start', { method: 'POST' }), 2000);
+            if (selectedScraper.running) {
+                await fetch('/api/scrapers/' + name + '/stop', { method: 'POST' });
+                showToast('&#x23F8;&#xFE0F; ' + capitalize(name) + ' stopped');
+            } else {
+                await fetch('/api/scrapers/' + name + '/start', { method: 'POST' });
+                showToast('&#x25B6; ' + capitalize(name) + ' started');
             }
-
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '💾 Update & Apply';
-            showToast('✅ Settings saved!');
-            setTimeout(fetchJobs, 3000);
+            toggleScraperBtn.disabled = false;
+            setTimeout(fetchScrapers, 500);
         };
 
-        toggleBtn.onclick = async () => {
-            toggleBtn.disabled = true;
-            if (isRunning) {
-                await fetch('/api/stop', { method: 'POST' });
-                showToast('⏸ Scraper stopped');
-            } else {
-                await fetch('/api/start', { method: 'POST' });
-                showToast('▶ Scraper started');
-            }
-            toggleBtn.disabled = false;
-            setTimeout(fetchStatus, 500);
+        saveSettingsBtn.onclick = async () => {
+            if (!selectedScraper) return;
+            saveSettingsBtn.disabled = true;
+            saveSettingsBtn.innerHTML = '&#x23F3; Saving...';
+            const name = selectedScraper.name;
+
+            const settings = {};
+            document.querySelectorAll('#settingsFields .input-group input, #settingsFields .input-group select').forEach(inp => {
+                const key = inp.id.replace('field_', '');
+                settings[key] = inp.value;
+            });
+
+            await fetch('/api/settings/' + name, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+            });
+
+            saveSettingsBtn.disabled = false;
+            saveSettingsBtn.innerHTML = '&#x1F4BE; Save';
+            showToast('&#x2705; ' + capitalize(name) + ' settings saved!');
+            setTimeout(fetchScrapers, 1000);
         };
 
         clearBtn.onclick = async () => {
             if (!confirm('Are you sure you want to clear the database? This will delete all saved jobs from Google Sheets.')) return;
-
             clearBtn.disabled = true;
-            clearBtn.innerHTML = '⏳ Clearing...';
+            clearBtn.innerHTML = '&#x23F3; Clearing...';
             await fetch('/api/clear-db', { method: 'POST' });
             clearBtn.disabled = false;
-            clearBtn.innerHTML = '🗑 Clear Database';
-            showToast('🗑 Database cleared');
+            clearBtn.innerHTML = '&#x1F5D1; Clear Database';
+            showToast('&#x1F5D1; Database cleared');
             fetchJobs();
         };
 
         refreshBtn.onclick = () => {
             fetchJobs();
-            showToast('🔄 Refreshed');
+            showToast('&#x1F504; Refreshed');
         };
 
-        // ── Init ──────────────────────────────────────────────────────────────
-        fetchSettings();
-        fetchStatus();
-        fetchJobs();
+        // ── Polling ────────────────────────────────────────────────────────────
+        async function pollAll() {
+            await Promise.all([fetchScrapers(), fetchJobs(), fetchStatus()]);
+            populateSourceFilter();
+        }
 
+        // ── Init ──────────────────────────────────────────────────────────────
+        pollAll();
+        setInterval(pollAll, 15000);
         setInterval(fetchJobs, 30000);
-        setInterval(fetchStatus, 5000);
     </script>
 </body>
+
 </html>

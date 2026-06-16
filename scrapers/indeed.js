@@ -1,133 +1,203 @@
 const crypto = require('crypto');
 const sheets = require('../sheets');
 const { notify } = require('../notifier');
-const { launchBrowser, makeWalkinRe } = require('./base-scraper');
+const { launchBrowser } = require('./base-scraper');
 
 const NAME = 'indeed';
-const DEFAULT_SETTINGS = { keyword: 'java developer', location: 'india' };
+const DEFAULT_SETTINGS = { enabled: '1', keyword: 'software developer', location: 'hyderabad', locations: 'hyderabad,bangalore,chennai', jobtype: 'fresher', dateposted: '1', sc: '0kf%3Aattr%287EQCZ%29%3B' };
+const SEARCH_URL = 'https://in.indeed.com/jobs?q=$$KEYWORD&l=$$LOCATION';
 
-async function getHeaders() {
-  return { ready: true, ts: Date.now() };
+let browser = null;
+let page = null;
+let reuseCount = 0;
+const MAX_REUSE = 20;
+let locationIndex = 0;
+
+async function getOrCreatePage() {
+  if (browser && page && reuseCount < MAX_REUSE) {
+    try {
+      await page.evaluate(() => 1);
+      reuseCount++;
+      return page;
+    } catch { }
+  }
+  if (browser) await browser.close().catch(() => { });
+  browser = await launchBrowser();
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    viewport: { width: 1366, height: 768 },
+    locale: 'en-US',
+  });
+  page = await context.newPage();
+  reuseCount = 0;
+  console.log('[Indeed] New browser launched');
+  return page;
 }
 
-async function scrape() {
+async function closeBrowser() {
+  if (browser) {
+    await browser.close().catch(() => { });
+    browser = null;
+    page = null;
+  }
+}
+
+async function getHeaders() {
+  try {
+    const p = await getOrCreatePage();
+    const ctx = p.context();
+    await p.goto('https://in.indeed.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p.waitForTimeout(5000);
+
+    const cookies = await ctx.cookies();
+    const userAgent = await p.evaluate(() => navigator.userAgent);
+
+    console.log(`[Indeed] Session ready: ${cookies.length} cookies, UA: ${userAgent.slice(0, 50)}`);
+    return { ready: true, cookies, userAgent, ts: Date.now() };
+  } catch (err) {
+    console.log(`[Indeed] getHeaders error: ${err.message}`);
+    await closeBrowser();
+    return null;
+  }
+}
+
+async function scrape(headers) {
   const settings = sheets.getScraperSettings(NAME);
   const keyword = settings.keyword || DEFAULT_SETTINGS.keyword;
-  const location = settings.location || DEFAULT_SETTINGS.location;
+  const jobtype = settings.jobtype || DEFAULT_SETTINGS.jobtype;
+  const dateposted = settings.dateposted || DEFAULT_SETTINGS.dateposted;
+  const sc = settings.sc || DEFAULT_SETTINGS.sc;
+
+  let location = settings.location || DEFAULT_SETTINGS.location;
+  const locations = ((settings.locations || DEFAULT_SETTINGS.locations) || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (locations.length) {
+    locationIndex = locationIndex % locations.length;
+    location = locations[locationIndex];
+    locationIndex++;
+  }
 
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`[${timestamp}] [Indeed] Scraping for '${keyword}' in '${location}'...`);
+  console.log(`[${timestamp}] [Indeed] Scraping '${keyword}' in '${location}'${jobtype ? ' [' + jobtype + ']' : ''}${dateposted ? ' (last ' + dateposted + 'd)' : ''}...`);
 
-  let browser;
   try {
-    browser = await launchBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      viewport: { width: 1366, height: 768 },
-      locale: 'en-US',
-    });
-    const page = await context.newPage();
+    const p = await getOrCreatePage();
+    const ctx = p.context();
 
-    const searchUrl = `https://in.indeed.com/jobs?q=${encodeURIComponent(keyword)}&l=${encodeURIComponent(location)}`;
-    console.log(`[Indeed] Loading: ${searchUrl}`);
+    if (headers?.cookies && reuseCount <= 1) {
+      await ctx.addCookies(headers.cookies);
+    }
 
-    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(5000);
+    let url = SEARCH_URL
+      .replace('$$KEYWORD', encodeURIComponent(keyword))
+      .replace('$$LOCATION', encodeURIComponent(location));
+    if (jobtype) url += '&jt=' + encodeURIComponent(jobtype);
+    if (dateposted) url += '&fromage=' + encodeURIComponent(dateposted);
+    if (sc) url += '&sc=' + sc;
+    console.log(`[Indeed] URL: ${url}`);
+    console.log(`[Indeed] Loading search page...`);
+    await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p.waitForTimeout(4000);
 
-    const jobCards = await page.evaluate(() => {
-      const results = [];
-      const links = document.querySelectorAll('a.jcs-JobTitle');
-      links.forEach(a => {
-        const jk = a.getAttribute('data-jk') || '';
-        const title = (a.getAttribute('title') || a.textContent).trim();
-        const href = a.getAttribute('href') || '';
-        const url = href.startsWith('http') ? href : 'https://in.indeed.com' + href;
-        let company = '';
-        const cmpMatch = href.match(/[?&]cmp=([^&]+)/);
-        if (cmpMatch) {
-          company = decodeURIComponent(cmpMatch[1].replace(/\+/g, ' ')).replace(/-/g, ' ');
-        }
-        if (!company) {
-          const card = a.closest('[class*="mosaic-provider-jobcards"]') || a.closest('div.css-pt3vth');
-          if (card) {
-            const parts = card.textContent.match(/View all (.+?) jobs/);
-            if (parts) company = parts[1].trim();
-          }
-        }
-        if (title && jk) {
-          results.push({ title, company, url, jk });
-        }
-      });
-      return results;
-    });
+    const results = await extractPageResults(p, url);
 
-    console.log(`[Indeed] Found ${jobCards.length} job listings on search page.`);
-    const walkinRe = makeWalkinRe();
+    if (!results || results.length === 0) {
+      console.log('[Indeed] No results - may need fresh headers.');
+      await closeBrowser();
+      return false;
+    }
+
+    const walkinRe = /\b(walk[- ]?in)\b/i;
     let saved = 0;
 
-    for (const card of jobCards) {
-      const hash = makeHash(card.title, card.company, card.url);
+    for (const job of results) {
+      const hash = makeHash(job.title, job.company, job.jobkey);
       if (!sheets.isNewJob(hash)) continue;
 
-      let company = card.company;
-      let locationText = 'India';
+      const jobDate = job.pubDate
+        ? new Date(job.pubDate).toISOString()
+        : new Date().toISOString();
 
-      try {
-        await page.goto(`https://in.indeed.com/viewjob?jk=${card.jk}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(3000);
+      const isWalkin = walkinRe.test(job.title) || walkinRe.test(job.company) || walkinRe.test(job.snippet || '');
 
-        const detail = await page.evaluate(() => {
-          const compEl = document.querySelector('[data-testid="inlineHeader-companyName"] a, [data-company-name="true"] a');
-          const locEl = document.querySelector('[data-testid="inlineHeader-companyLocation"], [data-testid="text-location"]');
-          return {
-            company: compEl ? compEl.textContent.trim() : '',
-            location: locEl ? locEl.textContent.trim() : '',
-          };
-        });
-
-        company = detail.company || company || 'Unknown';
-        locationText = detail.location || 'India';
-      } catch (err) {
-        console.log(`[Indeed] Detail page error for ${card.title}: ${err.message}`);
-        company = company || 'Unknown';
+      let salaryText = '';
+      if (job.salary) {
+        try {
+          const s = typeof job.salary === 'string' ? JSON.parse(job.salary) : job.salary;
+          if (s.text) salaryText = s.text;
+        } catch { salaryText = String(job.salary); }
       }
 
-      const isWalkin = walkinRe.test(card.title) || walkinRe.test(company);
-
+      const jobUrl = job.url || `https://in.indeed.com/viewjob?jk=${job.jobkey}`;
       const jobData = {
-        title: card.title,
-        company,
-        location: locationText,
-        url: card.url,
+        title: job.title,
+        company: job.company,
+        location: job.location + (job.remoteText ? ` (${job.remoteText})` : ''),
+        url: jobUrl,
         source: NAME,
         hash,
-        date: new Date().toISOString(),
+        date: jobDate,
         isWalkin,
+        salary: salaryText,
+        snippet: cleanupSnippet(job.snippet),
       };
 
-      console.log(`[Indeed] NEW: ${card.title} @ ${company} [${locationText}]`);
+      console.log(`[Indeed] NEW: ${job.title} @ ${job.company} [${job.location}]${salaryText ? ' ' + salaryText : ''}`);
       await notify(jobData);
       await sheets.saveJob(jobData);
       saved++;
-
-      await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(2000);
     }
 
-    await browser.close();
-    console.log(`[Indeed] Done. Saved ${saved} new jobs out of ${jobCards.length} listings.`);
+    console.log(`[Indeed] Done. ${saved} new / ${results.length} total (reuse #${reuseCount}).`);
     return true;
   } catch (err) {
     console.log(`[Indeed] Error: ${err.message}`);
-    if (browser) await browser.close().catch(() => { });
+    await closeBrowser();
     return false;
   }
 }
 
-function makeHash(title, company, url) {
-  const jk = url.match(/[?&]jk=([^&]+)/);
-  const stableId = jk ? jk[1] : url.trim();
-  const raw = `${title.toLowerCase().trim()}|${(company || '').toLowerCase().trim()}|${stableId}`;
+async function extractPageResults(page, baseUrl) {
+  return await page.evaluate((baseUrl) => {
+    try {
+      const model = window.mosaic?.providerData?.['mosaic-provider-jobcards']?.metaData?.mosaicProviderJobCardsModel;
+      if (!model?.results) return [];
+      return model.results.map(r => ({
+        title: r.displayTitle || r.normTitle || r.title || '',
+        company: r.company || r.truncatedCompany || '',
+        location: r.formattedLocation || '',
+        salary: r.extractedSalary || '',
+        snippet: r.snippet || '',
+        relativeTime: r.formattedRelativeTime || '',
+        pubDate: r.pubDate || r.createDate || 0,
+        remote: r.remoteWorkModel?.type || '',
+        remoteText: r.remoteWorkModel?.text || '',
+        sponsored: !!r.sponsored,
+        jobkey: r.jobkey || '',
+        url: r.viewJobLink
+          ? 'https://in.indeed.com' + r.viewJobLink
+          : r.link
+            ? 'https://in.indeed.com' + r.link
+            : r.jobkey
+              ? 'https://in.indeed.com/viewjob?jk=' + r.jobkey
+              : baseUrl,
+        companyRating: r.companyRating || 0,
+        companyReviewCount: r.companyReviewCount || 0,
+        urgentlyHiring: !!r.urgentlyHiring,
+        jobTypes: r.taxonomyAttributes || [],
+      }));
+    } catch (e) {
+      return [];
+    }
+  }, baseUrl);
+}
+
+function cleanupSnippet(snippet) {
+  if (!snippet) return '';
+  return snippet.replace(/<[^>]*>/g, ' ').replace(/&[^;]+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+
+function makeHash(title, company, jobkey) {
+  const raw = `${title.toLowerCase().trim()}|${(company || '').toLowerCase().trim()}|${jobkey}`;
   return crypto.createHash('md5').update(raw).digest('hex');
 }
 
@@ -135,9 +205,45 @@ function getDefaultSettings() {
   return { ...DEFAULT_SETTINGS };
 }
 
+function getSettingsSchema() {
+  return [
+    {
+      key: 'enabled', label: 'Enabled', type: 'select', options: [
+        { value: '1', label: 'Yes' },
+        { value: '0', label: 'No' },
+      ],
+    },
+    { key: 'keyword', label: 'Keyword', type: 'text', placeholder: 'e.g. software developer' },
+    { key: 'location', label: 'Location', type: 'text', placeholder: 'e.g. hyderabad' },
+    { key: 'locations', label: 'Locations (cycle through)', type: 'text', placeholder: 'e.g. hyderabad,bangalore,chennai' },
+    {
+      key: 'jobtype', label: 'Job Type', type: 'select', options: [
+        { value: '', label: 'Any' },
+        { value: 'fresher', label: 'Fresher' },
+        { value: 'fulltime', label: 'Full-time' },
+        { value: 'parttime', label: 'Part-time' },
+        { value: 'contract', label: 'Contract' },
+        { value: 'internship', label: 'Internship' },
+        { value: 'temporary', label: 'Temporary' },
+      ],
+    },
+    { key: 'sc', label: 'SC Filter Param', type: 'text', placeholder: 'e.g. 0kf%3Aattr%287EQCZ%29%3B' },
+    {
+      key: 'dateposted', label: 'Date Posted', type: 'select', options: [
+        { value: '', label: 'Any' },
+        { value: '1', label: 'Last 24 hours' },
+        { value: '3', label: 'Last 3 days' },
+        { value: '7', label: 'Last 7 days' },
+        { value: '14', label: 'Last 14 days' },
+      ],
+    },
+  ];
+}
+
 module.exports = {
   name: NAME,
   getHeaders,
   scrape,
   getDefaultSettings,
+  getSettingsSchema,
 };
