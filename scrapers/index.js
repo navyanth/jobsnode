@@ -96,12 +96,14 @@ function start(name) {
     st.stopRequested = false;
     setImmediate(() => tick(scraper));
   } else {
+    let delay = 0;
     for (const scraper of registered) {
       const st = state[scraper.name];
       if (st.running) continue;
       st.running = true;
       st.stopRequested = false;
-      setImmediate(() => tick(scraper));
+      setTimeout(() => tick(scraper), delay);
+      delay += 30000;
     }
   }
 }

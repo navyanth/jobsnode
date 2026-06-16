@@ -8,27 +8,55 @@ const DEFAULT_SETTINGS = { enabled: '1', keyword: 'software developer', location
 const SEARCH_URL = 'https://in.indeed.com/jobs?q=$$KEYWORD&l=$$LOCATION';
 
 let locationIndex = 0;
+let browser = null;
+let page = null;
+let reuseCount = 0;
+const MAX_REUSE = 5;
+let browserLock = false;
 
-async function newPage() {
-  const b = await launchBrowser();
-  const context = await b.newContext({
+async function acquireBrowser() {
+  if (browserLock) return null;
+  browserLock = true;
+
+  if (browser && page && reuseCount < MAX_REUSE) {
+    try {
+      await page.evaluate(() => 1);
+      reuseCount++;
+      return page;
+    } catch { }
+  }
+
+  if (browser) {
+    try { await browser.close(); } catch { }
+    browser = null;
+    page = null;
+  }
+
+  browser = await launchBrowser();
+  const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     viewport: { width: 1366, height: 768 },
     locale: 'en-US',
   });
-  const p = await context.newPage();
-  return { browser: b, page: p, close: async () => { try { await b.close(); } catch { } } };
+  page = await context.newPage();
+  reuseCount = 0;
+  console.log('[Indeed] New browser launched');
+  return page;
+}
+
+function releaseBrowser() {
+  browserLock = false;
 }
 
 async function getHeaders() {
-  let session;
+  const p = await acquireBrowser();
+  if (!p) return null;
   try {
-    session = await newPage();
-    await session.page.goto('https://in.indeed.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await session.page.waitForTimeout(5000);
+    await p.goto('https://in.indeed.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p.waitForTimeout(5000);
 
-    const cookies = await session.page.context().cookies();
-    const userAgent = await session.page.evaluate(() => navigator.userAgent);
+    const cookies = await p.context().cookies();
+    const userAgent = await p.evaluate(() => navigator.userAgent);
 
     console.log(`[Indeed] Session ready: ${cookies.length} cookies, UA: ${userAgent.slice(0, 50)}`);
     return { ready: true, cookies, userAgent, ts: Date.now() };
@@ -36,7 +64,7 @@ async function getHeaders() {
     console.log(`[Indeed] getHeaders error: ${err.message}`);
     return null;
   } finally {
-    if (session) await session.close();
+    releaseBrowser();
   }
 }
 
@@ -58,11 +86,14 @@ async function scrape(headers) {
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log(`[${timestamp}] [Indeed] Scraping '${keyword}' in '${location}'${jobtype ? ' [' + jobtype + ']' : ''}${dateposted ? ' (last ' + dateposted + 'd)' : ''}...`);
 
-  let session;
+  const p = await acquireBrowser();
+  if (!p) {
+    console.log('[Indeed] Browser busy — skipping this cycle.');
+    return false;
+  }
   try {
-    session = await newPage();
     if (headers?.cookies) {
-      try { await session.page.context().addCookies(headers.cookies); } catch { }
+      try { await p.context().addCookies(headers.cookies); } catch { }
     }
 
     let url = SEARCH_URL
@@ -73,31 +104,30 @@ async function scrape(headers) {
     if (sc) url += '&sc=' + sc;
     console.log(`[Indeed] URL: ${url}`);
     console.log(`[Indeed] Loading search page...`);
-    await session.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await session.page.waitForTimeout(5000);
+    await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await p.waitForTimeout(5000);
 
-    // scroll to trigger lazy-loaded job cards
     for (let i = 0; i < 3; i++) {
-      await session.page.evaluate(() => window.scrollBy(0, 800));
-      await session.page.waitForTimeout(1500);
+      await p.evaluate(() => window.scrollBy(0, 800));
+      await p.waitForTimeout(1500);
     }
-    await session.page.evaluate(() => window.scrollTo(0, 0));
-    await session.page.waitForTimeout(1000);
+    await p.evaluate(() => window.scrollTo(0, 0));
+    await p.waitForTimeout(1000);
 
-    console.log(`[Indeed] Page title: ${await session.page.title()}`);
+    console.log(`[Indeed] Page title: ${await p.title()}`);
 
-    // wait for mosaic data to appear
     try {
-      await session.page.waitForFunction(() => window.mosaic?.providerData?.['mosaic-provider-jobcards']?.metaData?.mosaicProviderJobCardsModel?.results?.length, { timeout: 15000 });
+      await p.waitForFunction(() => window.mosaic?.providerData?.['mosaic-provider-jobcards']?.metaData?.mosaicProviderJobCardsModel?.results?.length, { timeout: 15000 });
       console.log('[Indeed] Mosaic data loaded.');
     } catch {
       console.log('[Indeed] Mosaic data wait timed out, trying DOM extraction...');
     }
 
-    const results = await extractPageResults(session.page, url);
+    const results = await extractPageResults(p, url);
 
     if (!results || results.length === 0) {
-      console.log('[Indeed] No results - may need fresh headers.');
+      console.log('[Indeed] No results — may need fresh headers.');
+      reuseCount = MAX_REUSE;
       return false;
     }
 
@@ -142,13 +172,14 @@ async function scrape(headers) {
       saved++;
     }
 
-    console.log(`[Indeed] Done. ${saved} new / ${results.length} total.`);
+    console.log(`[Indeed] Done. ${saved} new / ${results.length} total (reuse #${reuseCount}).`);
     return true;
   } catch (err) {
     console.log(`[Indeed] Error: ${err.message}`);
+    reuseCount = MAX_REUSE;
     return false;
   } finally {
-    if (session) await session.close();
+    releaseBrowser();
   }
 }
 
