@@ -1,72 +1,27 @@
 const crypto = require('crypto');
 const sheets = require('../sheets');
 const { notify } = require('../notifier');
-const { launchBrowser, safeGoto, fetchWithRetry, makeWalkinRe } = require('./base-scraper');
+const { fetchWithRetry, makeWalkinRe } = require('./base-scraper');
 
 const NAME = 'simplyhired';
 const DEFAULT_SETTINGS = { enabled: '0', keyword: 'software developer fresher', location: 'bangalore' };
 const BASE_URL = 'https://www.simplyhired.co.in';
 
-async function extractBuildId() {
-  let browser;
+function extractJobsFromHtml(html) {
+  const match = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/);
+  if (!match) return null;
   try {
-    browser = await launchBrowser();
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      viewport: { width: 1366, height: 768 },
-      locale: 'en-IN',
-      timezoneId: 'Asia/Kolkata',
-    });
-    const page = await context.newPage();
-    await safeGoto(page, 'Loading homepage', `${BASE_URL}/`);
-    await page.waitForTimeout(3000);
-
-    const buildId = await page.evaluate(() => {
-      const script = document.getElementById('__NEXT_DATA__');
-      if (script) {
-        try { return JSON.parse(script.textContent).buildId; } catch (e) { return null; }
-      }
-      return null;
-    });
-
-    const cookies = await context.cookies();
-    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-
-    await browser.close();
-    browser = null;
-
-    if (buildId) {
-      console.log(`[SimplyHired] Build ID: ${buildId} (${cookies.length} cookies)`);
-      return { buildId, cookieStr };
-    }
-    console.log('[SimplyHired] Build ID not found, using fallback.');
-    return { buildId: 'fax-YdvvdVlHuYP_SPx0y', cookieStr };
-  } catch (err) {
-    console.log(`[SimplyHired] Build ID extraction error: ${err.message}`);
-    if (browser) await browser.close().catch(() => { });
-    return { buildId: 'fax-YdvvdVlHuYP_SPx0y', cookieStr: '' };
+    const data = JSON.parse(match[1]);
+    return data.props?.pageProps?.jobs || data.pageProps?.jobs || null;
+  } catch {
+    return null;
   }
 }
 
-async function getHeaders() {
-  console.log('[SimplyHired] Capturing build ID from homepage...');
-  const { buildId, cookieStr } = await extractBuildId();
-  return { buildId, cookieStr, 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'x-nextjs-data': '1' };
-}
-
-async function scrape(headers) {
+async function scrape() {
   const settings = sheets.getScraperSettings(NAME);
   const keywords = (settings.keyword || DEFAULT_SETTINGS.keyword).split(',').map(s => s.trim()).filter(Boolean);
   const locations = (settings.location || DEFAULT_SETTINGS.location).split(',').map(s => s.trim()).filter(Boolean);
-  const buildId = headers.buildId || 'fax-YdvvdVlHuYP_SPx0y';
-
-  const requestHeaders = {
-    'user-agent': headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'x-nextjs-data': '1',
-    'referer': `${BASE_URL}/`,
-    'accept': 'application/json',
-  };
-  if (headers.cookieStr) requestHeaders['cookie'] = headers.cookieStr;
 
   const walkinRe = makeWalkinRe();
   let anySuccess = false;
@@ -76,29 +31,42 @@ async function scrape(headers) {
       const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
       console.log(`[${timestamp}] [SimplyHired] Polling '${keyword}' in '${location}'...`);
 
-      const q = encodeURIComponent(keyword).replace(/%20/g, '+');
-      const l = encodeURIComponent(location).replace(/%20/g, '+');
-      const apiUrl = `${BASE_URL}/_next/data/${buildId}/en-IN/search.json?q=${q}&l=${l}&t=1`;
+      const q = encodeURIComponent(keyword);
+      const l = encodeURIComponent(location);
+      const pageUrl = `${BASE_URL}/search?q=${q}&l=${l}`;
+
+      const headers = {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.5',
+        'referer': `${BASE_URL}/`,
+      };
 
       let res;
       try {
-        res = await fetchWithRetry(apiUrl, requestHeaders, { timeout: 30000, retries: 3 });
+        res = await fetchWithRetry(pageUrl, headers, { timeout: 30000, retries: 3 });
       } catch (err) {
         if (err.name === 'TimeoutError' || err.message.includes('timeout')) {
-          console.log('[SimplyHired] Timeout — headers may be stale, will refresh.');
+          console.log('[SimplyHired] Timeout fetching search page.');
           return false;
         }
         throw err;
       }
 
       if (res.status !== 200) {
-        console.log(`[SimplyHired] Got ${res.status} — headers stale, will refresh buildId.`);
+        console.log(`[SimplyHired] Got ${res.status} from search page.`);
         return false;
       }
 
+      const html = await res.text();
+      const jobs = extractJobsFromHtml(html);
+
+      if (!jobs || !jobs.length) {
+        console.log(`[SimplyHired] No jobs found for '${keyword}' in '${location}'.`);
+        continue;
+      }
+
       anySuccess = true;
-      const data = await res.json();
-      const jobs = data.pageProps?.jobs || [];
       console.log(`[SimplyHired] Got ${jobs.length} jobs for '${keyword}' in '${location}'.`);
 
       for (const job of jobs) {
@@ -161,7 +129,6 @@ function getSettingsSchema() {
 
 module.exports = {
   name: NAME,
-  getHeaders,
   scrape,
   getDefaultSettings,
   getSettingsSchema,

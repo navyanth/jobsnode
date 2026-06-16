@@ -57,23 +57,27 @@ async function tick(scraper) {
     return;
   }
 
-  if (!st.headers) {
-    console.log(`[Manager] ${scraper.name}: capturing headers...`);
-    st.headers = await scraper.getHeaders();
+  if (scraper.getHeaders) {
     if (!st.headers) {
-      console.log(`[Manager] ${scraper.name}: failed to capture headers, retrying...`);
-      const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;
-      st.timer = setTimeout(() => tick(scraper), intervalMs);
-      return;
+      console.log(`[Manager] ${scraper.name}: capturing headers...`);
+      st.headers = await scraper.getHeaders();
+      if (!st.headers) {
+        console.log(`[Manager] ${scraper.name}: failed to capture headers, retrying...`);
+        const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;
+        st.timer = setTimeout(() => tick(scraper), intervalMs);
+        return;
+      }
     }
   }
 
   try {
-    const ok = await scraper.scrape(st.headers);
-    if (!ok) st.headers = null;
+    const ok = scraper.getHeaders
+      ? await scraper.scrape(st.headers)
+      : await scraper.scrape();
+    if (scraper.getHeaders && !ok) st.headers = null;
   } catch (err) {
     console.log(`[Manager] ${scraper.name}: error - ${err.message}`);
-    if (!err.message.includes('timeout') && err.name !== 'TimeoutError') {
+    if (scraper.getHeaders && !err.message.includes('timeout') && err.name !== 'TimeoutError') {
       st.headers = null;
     }
   }
