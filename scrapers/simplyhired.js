@@ -29,26 +29,29 @@ async function extractBuildId() {
       return null;
     });
 
+    const cookies = await context.cookies();
+    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
     await browser.close();
     browser = null;
 
     if (buildId) {
-      console.log(`[SimplyHired] Build ID: ${buildId}`);
-      return buildId;
+      console.log(`[SimplyHired] Build ID: ${buildId} (${cookies.length} cookies)`);
+      return { buildId, cookieStr };
     }
     console.log('[SimplyHired] Build ID not found, using fallback.');
-    return 'fax-YdvvdVlHuYP_SPx0y';
+    return { buildId: 'fax-YdvvdVlHuYP_SPx0y', cookieStr };
   } catch (err) {
     console.log(`[SimplyHired] Build ID extraction error: ${err.message}`);
     if (browser) await browser.close().catch(() => { });
-    return 'fax-YdvvdVlHuYP_SPx0y';
+    return { buildId: 'fax-YdvvdVlHuYP_SPx0y', cookieStr: '' };
   }
 }
 
 async function getHeaders() {
   console.log('[SimplyHired] Capturing build ID from homepage...');
-  const buildId = await extractBuildId();
-  return { buildId, 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'x-nextjs-data': '1' };
+  const { buildId, cookieStr } = await extractBuildId();
+  return { buildId, cookieStr, 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'x-nextjs-data': '1' };
 }
 
 async function scrape(headers) {
@@ -63,6 +66,7 @@ async function scrape(headers) {
     'referer': `${BASE_URL}/`,
     'accept': 'application/json',
   };
+  if (headers.cookieStr) requestHeaders['cookie'] = headers.cookieStr;
 
   const walkinRe = makeWalkinRe();
   let anySuccess = false;
