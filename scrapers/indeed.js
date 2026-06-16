@@ -95,8 +95,26 @@ async function scrape(headers) {
     if (sc) url += '&sc=' + sc;
     console.log(`[Indeed] URL: ${url}`);
     console.log(`[Indeed] Loading search page...`);
-    await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await p.waitForTimeout(4000);
+    await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+    await p.waitForTimeout(5000);
+
+    // scroll to trigger lazy-loaded job cards
+    for (let i = 0; i < 3; i++) {
+      await p.evaluate(() => window.scrollBy(0, 800));
+      await p.waitForTimeout(1500);
+    }
+    await p.evaluate(() => window.scrollTo(0, 0));
+    await p.waitForTimeout(1000);
+
+    console.log(`[Indeed] Page title: ${await p.title()}`);
+
+    // wait for mosaic data to appear
+    try {
+      await p.waitForFunction(() => window.mosaic?.providerData?.['mosaic-provider-jobcards']?.metaData?.mosaicProviderJobCardsModel?.results?.length, { timeout: 15000 });
+      console.log('[Indeed] Mosaic data loaded.');
+    } catch {
+      console.log('[Indeed] Mosaic data wait timed out, trying DOM extraction...');
+    }
 
     const results = await extractPageResults(p, url);
 
@@ -157,38 +175,68 @@ async function scrape(headers) {
 }
 
 async function extractPageResults(page, baseUrl) {
-  return await page.evaluate((baseUrl) => {
+  const results = await page.evaluate((baseUrl) => {
+    // try mosaic data first
     try {
       const model = window.mosaic?.providerData?.['mosaic-provider-jobcards']?.metaData?.mosaicProviderJobCardsModel;
-      if (!model?.results) return [];
-      return model.results.map(r => ({
-        title: r.displayTitle || r.normTitle || r.title || '',
-        company: r.company || r.truncatedCompany || '',
-        location: r.formattedLocation || '',
-        salary: r.extractedSalary || '',
-        snippet: r.snippet || '',
-        relativeTime: r.formattedRelativeTime || '',
-        pubDate: r.pubDate || r.createDate || 0,
-        remote: r.remoteWorkModel?.type || '',
-        remoteText: r.remoteWorkModel?.text || '',
-        sponsored: !!r.sponsored,
-        jobkey: r.jobkey || '',
-        url: r.viewJobLink
-          ? 'https://in.indeed.com' + r.viewJobLink
-          : r.link
-            ? 'https://in.indeed.com' + r.link
-            : r.jobkey
-              ? 'https://in.indeed.com/viewjob?jk=' + r.jobkey
-              : baseUrl,
-        companyRating: r.companyRating || 0,
-        companyReviewCount: r.companyReviewCount || 0,
-        urgentlyHiring: !!r.urgentlyHiring,
-        jobTypes: r.taxonomyAttributes || [],
-      }));
-    } catch (e) {
-      return [];
-    }
+      if (model?.results?.length) {
+        return model.results.map(r => ({
+          title: r.displayTitle || r.normTitle || r.title || '',
+          company: r.company || r.truncatedCompany || '',
+          location: r.formattedLocation || '',
+          salary: r.extractedSalary || '',
+          snippet: r.snippet || '',
+          relativeTime: r.formattedRelativeTime || '',
+          pubDate: r.pubDate || r.createDate || 0,
+          remote: r.remoteWorkModel?.type || '',
+          remoteText: r.remoteWorkModel?.text || '',
+          sponsored: !!r.sponsored,
+          jobkey: r.jobkey || '',
+          url: r.viewJobLink
+            ? 'https://in.indeed.com' + r.viewJobLink
+            : r.link
+              ? 'https://in.indeed.com' + r.link
+              : r.jobkey
+                ? 'https://in.indeed.com/viewjob?jk=' + r.jobkey
+                : baseUrl,
+          companyRating: r.companyRating || 0,
+          companyReviewCount: r.companyReviewCount || 0,
+          urgentlyHiring: !!r.urgentlyHiring,
+          jobTypes: r.taxonomyAttributes || [],
+          source: 'mosaic',
+        }));
+      }
+    } catch {}
+
+    // fallback: extract from DOM
+    const cards = document.querySelectorAll('[data-jk]');
+    return Array.from(cards).map(card => {
+      const jk = card.getAttribute('data-jk') || '';
+      const titleEl = card.querySelector('.jobTitle span') || card.querySelector('[id^="jobTitle-"]');
+      const companyEl = card.querySelector('[data-testid="company-name"]');
+      const locationEl = card.querySelector('[data-testid="text-location"]');
+      const salaryEl = card.querySelector('[data-testid="attribute_snippet_testid"]');
+      const snippetEl = card.querySelector('.job-snippet') || card.querySelector('[class*="snippet"]');
+      return {
+        title: titleEl?.textContent?.trim() || '',
+        company: companyEl?.textContent?.trim() || '',
+        location: locationEl?.textContent?.trim() || '',
+        salary: salaryEl?.textContent?.trim() || '',
+        snippet: snippetEl?.textContent?.trim() || '',
+        jobkey: jk,
+        url: jk ? 'https://in.indeed.com/viewjob?jk=' + jk : baseUrl,
+        source: 'dom',
+      };
+    }).filter(j => j.title);
   }, baseUrl);
+
+  if (results.length) {
+    const src = results[0].source;
+    console.log(`[Indeed] Extracted ${results.length} results via ${src}`);
+    // remove internal source field
+    return results.map(({ source, ...r }) => r);
+  }
+  return [];
 }
 
 function cleanupSnippet(snippet) {
