@@ -48,7 +48,8 @@ async function tick(scraper) {
     return;
   }
 
-  const sSettings = sheets.getScraperSettings(scraper.name);
+  const defaults = scraper.getDefaultSettings ? scraper.getDefaultSettings() : {};
+  const sSettings = { ...defaults, ...sheets.getScraperSettings(scraper.name) };
   if (sSettings.enabled === '0') {
     console.log(`[Manager] ${scraper.name}: disabled via settings, skipping.`);
     const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;

@@ -4,7 +4,7 @@ const { notify } = require('../notifier');
 const { launchBrowser, safeGoto, fetchWithRetry, makeWalkinRe } = require('./base-scraper');
 
 const NAME = 'simplyhired';
-const DEFAULT_SETTINGS = { enabled: '1', keyword: 'software developer fresher', location: 'Hyderabad, Telangana' };
+const DEFAULT_SETTINGS = { enabled: '0', keyword: 'software developer fresher', location: 'bangalore' };
 const BASE_URL = 'https://www.simplyhired.co.in';
 
 async function extractBuildId() {
@@ -53,14 +53,9 @@ async function getHeaders() {
 
 async function scrape(headers) {
   const settings = sheets.getScraperSettings(NAME);
-  const keyword = settings.keyword || DEFAULT_SETTINGS.keyword;
-  const location = settings.location || DEFAULT_SETTINGS.location;
+  const keywords = (settings.keyword || DEFAULT_SETTINGS.keyword).split(',').map(s => s.trim()).filter(Boolean);
+  const locations = (settings.location || DEFAULT_SETTINGS.location).split(',').map(s => s.trim()).filter(Boolean);
   const buildId = headers.buildId || 'fax-YdvvdVlHuYP_SPx0y';
-
-  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`[${timestamp}] [SimplyHired] Polling for '${keyword}' in '${location}'...`);
-
-  const apiUrl = `${BASE_URL}/_next/data/${buildId}/en-IN/search.json?q=${encodeURIComponent(keyword)}&l=${encodeURIComponent(location)}`;
 
   const requestHeaders = {
     'user-agent': headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -69,60 +64,75 @@ async function scrape(headers) {
     'accept': 'application/json',
   };
 
-  let res;
-  try {
-    res = await fetchWithRetry(apiUrl, requestHeaders, { timeout: 30000, retries: 3 });
-  } catch (err) {
-    if (err.name === 'TimeoutError' || err.message.includes('timeout')) {
-      console.log('[SimplyHired] All fetch attempts timed out.');
-      return false;
-    }
-    throw err;
-  }
+  const walkinRe = makeWalkinRe();
+  let anySuccess = false;
 
-  if (res.status === 200) {
-    const data = await res.json();
-    const jobs = data.pageProps?.jobs || [];
-    console.log(`[SimplyHired] Got ${jobs.length} jobs from API.`);
+  for (const keyword of keywords) {
+    for (const location of locations) {
+      const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      console.log(`[${timestamp}] [SimplyHired] Polling '${keyword}' in '${location}'...`);
 
-    const walkinRe = makeWalkinRe();
-    for (const job of jobs) {
-      const title = job.title || 'Unknown';
-      const company = job.company || 'Unknown';
-      const loc = job.location || location;
-      const url = job.botUrl ? `${BASE_URL}${job.botUrl}` : '';
-      const salaryInfo = job.salaryInfo || '';
+      const q = encodeURIComponent(keyword).replace(/%20/g, '+');
+      const l = encodeURIComponent(location).replace(/%20/g, '+');
+      const apiUrl = `${BASE_URL}/_next/data/${buildId}/en-IN/search.json?q=${q}&l=${l}&t=1`;
 
-      const hash = makeHash(title, company, url);
+      let res;
+      try {
+        res = await fetchWithRetry(apiUrl, requestHeaders, { timeout: 30000, retries: 3 });
+      } catch (err) {
+        if (err.name === 'TimeoutError' || err.message.includes('timeout')) {
+          console.log('[SimplyHired] Timeout — headers may be stale, will refresh.');
+          return false;
+        }
+        throw err;
+      }
 
-      if (sheets.isNewJob(hash)) {
-        console.log(`[SimplyHired] Found job: ${title} @ ${company}`);
+      if (res.status !== 200) {
+        console.log(`[SimplyHired] Got ${res.status} — headers stale, will refresh buildId.`);
+        return false;
+      }
 
-        const jobDate = job.dateOnIndeed ? new Date(job.dateOnIndeed).toISOString() : new Date().toISOString();
+      anySuccess = true;
+      const data = await res.json();
+      const jobs = data.pageProps?.jobs || [];
+      console.log(`[SimplyHired] Got ${jobs.length} jobs for '${keyword}' in '${location}'.`);
 
-        const jobData = {
-          title,
-          company,
-          location: loc,
-          url,
-          source: NAME,
-          hash,
-          date: jobDate,
-          isWalkin: walkinRe.test(title + ' ' + company + ' ' + loc + ' ' + salaryInfo),
-          salary: salaryInfo || undefined,
-          snippet: job.snippet || undefined,
-        };
+      for (const job of jobs) {
+        const title = job.title || 'Unknown';
+        const company = job.company || 'Unknown';
+        const loc = job.location || location;
+        const url = job.botUrl ? `${BASE_URL}${job.botUrl}` : '';
+        const salaryInfo = job.salaryInfo || '';
 
-        console.log(`      -> NEW: ${title} @ ${company}`);
-        await notify(jobData);
-        await sheets.saveJob(jobData);
+        const hash = makeHash(title, company, url);
+
+        if (sheets.isNewJob(hash)) {
+          console.log(`[SimplyHired] Found job: ${title} @ ${company}`);
+
+          const jobDate = job.dateOnIndeed ? new Date(job.dateOnIndeed).toISOString() : new Date().toISOString();
+
+          const jobData = {
+            title,
+            company,
+            location: loc,
+            url,
+            source: NAME,
+            hash,
+            date: jobDate,
+            isWalkin: walkinRe.test(title + ' ' + company + ' ' + loc + ' ' + salaryInfo),
+            salary: salaryInfo || undefined,
+            snippet: job.snippet || undefined,
+          };
+
+          console.log(`      -> NEW: ${title} @ ${company}`);
+          await notify(jobData);
+          await sheets.saveJob(jobData);
+        }
       }
     }
-    return true;
-  } else {
-    console.log(`[SimplyHired] Got ${res.status} — may need fresh build ID.`);
-    return false;
   }
+
+  return anySuccess;
 }
 
 function makeHash(title, company, url) {
@@ -141,7 +151,7 @@ function getSettingsSchema() {
       { value: '0', label: 'No' },
     ]},
     { key: 'keyword', label: 'Keyword', type: 'text', placeholder: 'e.g. software developer fresher' },
-    { key: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Hyderabad, Telangana' },
+    { key: 'location', label: 'Location', type: 'text', placeholder: 'e.g. bangalore' },
   ];
 }
 
