@@ -1,8 +1,9 @@
 const naukri = require('./naukri');
 const indeed = require('./indeed');
+const simplyhired = require('./simplyhired');
 const sheets = require('../sheets');
 
-const registered = [naukri, indeed];
+const registered = [naukri, indeed, simplyhired];
 
 const state = {};
 let runOnStart = true;
