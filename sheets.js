@@ -136,9 +136,17 @@ async function saveSettings(settings) {
 function getScraperSettings(name) {
   const prefix = `${name}_`;
   const result = {};
+  const unprefixedKeys = new Set();
   for (const [key, val] of Object.entries(settingsCache)) {
     if (key.startsWith(prefix)) {
-      result[key.slice(prefix.length)] = val;
+      const unprefixed = key.slice(prefix.length);
+      result[unprefixed] = val;
+      unprefixedKeys.add(unprefixed);
+    }
+  }
+  for (const [key, val] of Object.entries(settingsCache)) {
+    if (!key.startsWith(`${name}_`) && !key.includes('_') && !unprefixedKeys.has(key)) {
+      result[key] = val;
     }
   }
   return result;
