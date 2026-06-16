@@ -95,7 +95,7 @@ async function scrape(headers) {
     if (sc) url += '&sc=' + sc;
     console.log(`[Indeed] URL: ${url}`);
     console.log(`[Indeed] Loading search page...`);
-    await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+    await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await p.waitForTimeout(5000);
 
     // scroll to trigger lazy-loaded job cards
