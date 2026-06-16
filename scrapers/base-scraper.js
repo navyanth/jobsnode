@@ -2,7 +2,27 @@ const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 
-async function launchBrowser() {
+let browserInUse = false;
+const browserQueue = [];
+
+async function acquireBrowser() {
+  if (browserInUse) {
+    return new Promise(resolve => browserQueue.push(resolve));
+  }
+  browserInUse = true;
+  return await launchFresh();
+}
+
+function releaseBrowser() {
+  browserInUse = false;
+  const next = browserQueue.shift();
+  if (next) {
+    browserInUse = true;
+    launchFresh().then(b => next(b));
+  }
+}
+
+async function launchFresh() {
   return await chromium.launch({
     headless: true,
     args: [
@@ -10,7 +30,6 @@ async function launchBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
-      '--single-process',
       '--memory-pressure-off',
       '--disable-component-extensions-with-background-pages',
       '--disable-background-networking',
@@ -75,6 +94,8 @@ function makeWalkinRe() {
 
 module.exports = {
   launchBrowser,
+  acquireBrowser,
+  releaseBrowser,
   newPage,
   safeGoto,
   cleanHeaders,

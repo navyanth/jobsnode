@@ -4,7 +4,7 @@
   "description": "Naukri job scraper with Google Sheets backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --optimize-for-size --max-old-space-size=384 server.js",
     "dev": "node server.js"
   },
   "dependencies": {

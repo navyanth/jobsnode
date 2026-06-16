@@ -1,16 +1,15 @@
 const crypto = require('crypto');
 const sheets = require('../sheets');
 const { notify } = require('../notifier');
-const { launchBrowser, safeGoto, cleanHeaders, fetchWithRetry, makeWalkinRe } = require('./base-scraper');
+const { acquireBrowser, releaseBrowser, safeGoto, cleanHeaders, fetchWithRetry, makeWalkinRe } = require('./base-scraper');
 
 const NAME = 'naukri';
 const DEFAULT_SETTINGS = { enabled: '1', keyword: 'java fresher', location: 'india', experience: '0' };
 
 async function getHeaders() {
   console.log('\n[Naukri] Opening naukri.com to capture headers...');
-  let browser;
+  const browser = await acquireBrowser();
   try {
-    browser = await launchBrowser();
     console.log(`[Naukri] Using: Chromium headless (Stealth)`);
 
     const context = await browser.newContext({
@@ -73,8 +72,6 @@ async function getHeaders() {
     };
 
     await Promise.race([headerPromise, runSteps()]);
-    await browser.close();
-    browser = null;
 
     if (capturedHeaders) {
       console.log('[Naukri] Headers captured successfully.');
@@ -85,8 +82,10 @@ async function getHeaders() {
     return capturedHeaders;
   } catch (err) {
     console.log(`[Naukri] Error: ${err.message}`);
-    if (browser) await browser.close().catch(() => { });
     return null;
+  } finally {
+    try { await browser.close(); } catch { }
+    releaseBrowser();
   }
 }
 

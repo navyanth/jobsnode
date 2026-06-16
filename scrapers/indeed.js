@@ -1,57 +1,23 @@
 const crypto = require('crypto');
 const sheets = require('../sheets');
 const { notify } = require('../notifier');
-const { launchBrowser } = require('./base-scraper');
+const { acquireBrowser, releaseBrowser } = require('./base-scraper');
 
 const NAME = 'indeed';
 const DEFAULT_SETTINGS = { enabled: '1', keyword: 'software developer', location: 'hyderabad', locations: 'hyderabad,bangalore,chennai', jobtype: 'fresher', dateposted: '1', sc: '0kf%3Aattr%287EQCZ%29%3B' };
 const SEARCH_URL = 'https://in.indeed.com/jobs?q=$$KEYWORD&l=$$LOCATION';
 
 let locationIndex = 0;
-let browser = null;
-let page = null;
-let reuseCount = 0;
-const MAX_REUSE = 5;
-let browserLock = false;
-
-async function acquireBrowser() {
-  if (browserLock) return null;
-  browserLock = true;
-
-  if (browser && page && reuseCount < MAX_REUSE) {
-    try {
-      await page.evaluate(() => 1);
-      reuseCount++;
-      return page;
-    } catch { }
-  }
-
-  if (browser) {
-    try { await browser.close(); } catch { }
-    browser = null;
-    page = null;
-  }
-
-  browser = await launchBrowser();
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    viewport: { width: 1366, height: 768 },
-    locale: 'en-US',
-  });
-  page = await context.newPage();
-  reuseCount = 0;
-  console.log('[Indeed] New browser launched');
-  return page;
-}
-
-function releaseBrowser() {
-  browserLock = false;
-}
 
 async function getHeaders() {
-  const p = await acquireBrowser();
-  if (!p) return null;
+  const browser = await acquireBrowser();
   try {
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      viewport: { width: 1366, height: 768 },
+      locale: 'en-US',
+    });
+    const p = await context.newPage();
     await p.goto('https://in.indeed.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await p.waitForTimeout(5000);
 
@@ -64,6 +30,7 @@ async function getHeaders() {
     console.log(`[Indeed] getHeaders error: ${err.message}`);
     return null;
   } finally {
+    try { await browser.close(); } catch { }
     releaseBrowser();
   }
 }
@@ -86,11 +53,13 @@ async function scrape(headers) {
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log(`[${timestamp}] [Indeed] Scraping '${keyword}' in '${location}'${jobtype ? ' [' + jobtype + ']' : ''}${dateposted ? ' (last ' + dateposted + 'd)' : ''}...`);
 
-  const p = await acquireBrowser();
-  if (!p) {
-    console.log('[Indeed] Browser busy — skipping this cycle.');
-    return false;
-  }
+  const browser = await acquireBrowser();
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    viewport: { width: 1366, height: 768 },
+    locale: 'en-US',
+  });
+  const p = await context.newPage();
   try {
     if (headers?.cookies) {
       try { await p.context().addCookies(headers.cookies); } catch { }
@@ -127,7 +96,6 @@ async function scrape(headers) {
 
     if (!results || results.length === 0) {
       console.log('[Indeed] No results — may need fresh headers.');
-      reuseCount = MAX_REUSE;
       return false;
     }
 
@@ -172,13 +140,13 @@ async function scrape(headers) {
       saved++;
     }
 
-    console.log(`[Indeed] Done. ${saved} new / ${results.length} total (reuse #${reuseCount}).`);
+    console.log(`[Indeed] Done. ${saved} new / ${results.length} total.`);
     return true;
   } catch (err) {
     console.log(`[Indeed] Error: ${err.message}`);
-    reuseCount = MAX_REUSE;
     return false;
   } finally {
+    try { await browser.close(); } catch { }
     releaseBrowser();
   }
 }
