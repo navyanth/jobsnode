@@ -50,7 +50,7 @@ async function tick(scraper) {
   const sSettings = sheets.getScraperSettings(scraper.name);
   if (sSettings.enabled === '0') {
     console.log(`[Manager] ${scraper.name}: disabled via settings, skipping.`);
-    const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 300) * 1000;
+    const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;
     st.timer = setTimeout(() => tick(scraper), intervalMs);
     return;
   }
@@ -60,7 +60,7 @@ async function tick(scraper) {
     st.headers = await scraper.getHeaders();
     if (!st.headers) {
       console.log(`[Manager] ${scraper.name}: failed to capture headers, retrying...`);
-      const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 300) * 1000;
+      const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;
       st.timer = setTimeout(() => tick(scraper), intervalMs);
       return;
     }
@@ -76,7 +76,7 @@ async function tick(scraper) {
     }
   }
 
-  const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 300) * 1000;
+  const intervalMs = (parseInt(process.env.SCRAPE_INTERVAL_SEC, 10) || 900) * 1000;
   st.timer = setTimeout(() => tick(scraper), intervalMs);
 }
 
